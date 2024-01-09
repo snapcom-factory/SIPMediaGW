@@ -12,6 +12,9 @@ services:
       - /tmp
     volumes:
       - ./logs:/var/logs
+      - /opt/JitsiMeetUIHelper:/var/JitsiMeetUIHelper
+      - /opt/SIPMediaGW/baresip/config_default:/var/baresip/config_default
+        #- /opt/SIPMediaGW/browsing/jitsi.py:/var/browsing/jitsi.py
     devices:
       - /dev/video${ID}:/dev/video0
       - /dev/snd:/dev/snd
@@ -22,8 +25,6 @@ services:
         tag: "{{.ImageName}}/{{.Name}}"
     env_file:
       - .env
-      - deploy/.env_kamailio
-      - deploy/.env_turn
     environment:
       TZ: "${HOST_TZ}" # Time Zone
       GW_ID: "${ID}"
