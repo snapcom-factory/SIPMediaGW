@@ -24,6 +24,7 @@ source <(grep = .env)
 
 lockFilePrefix="sipmediagw"
 gwNamePrefix="gw"
+prefix=$(/sbin/ifconfig ens3 | awk '/inet/ {print $2}' | head -n 1)
 
 lockGw() {
     maxGwNum=$(echo "$(nproc)/$CPU_PER_GW" | bc )
@@ -64,7 +65,7 @@ if [[ -z "$id" ]]; then
     exit 1
 fi
 
-restart="no"
+restart="unless-stopped"
 if [[ "$loop" ]]; then
     restart="unless-stopped"
 fi
