@@ -23,7 +23,11 @@ class Netstring:
         if inStr and len(inStr) > 0 :
             inStrLen = inStr[0:inStr.find(':')]
             resp = inStr.split(inStrLen+':')[1]
-            mDict = json.loads(resp[0:len(resp)-1])
+            try:
+                mDict = json.loads(resp[0:len(resp)-1], strict=False)
+            except:
+                mDict = {'event': 'null', 'type': 'null'}
+                print("Failed to load string as JSON", file=sys.stdout, flush=True)
 
         return mDict
 
@@ -55,6 +59,8 @@ class Netstring:
             # return exception message in netstring format
             retTxt = '{"event": true, "type": "TIME_OUT"}'
             return str(len(retTxt)) + ":" + retTxt + ","
+        except Exception as e:
+                    print("Failed to get status", file=sys.stdout, flush=True)
 
         return received
 
@@ -80,8 +86,8 @@ class Netstring:
                     if cmd:
                         self.__sendCommand(cmd)
         except:
-            print("Get events loop abnormally stopped", file=sys.stderr, flush=True)
-            print(traceback.format_exc(), file=sys.stderr, flush=True)
+            print("Get events loop abnormally stopped", file=sys.stdout, flush=True)
+            print(traceback.format_exc(), file=sys.stdout, flush=True)
         finally:
             self._sock.close()
 

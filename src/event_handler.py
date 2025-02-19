@@ -3,6 +3,7 @@ import socket
 import sys
 import atexit
 import time
+import psutil
 import os
 import inspect
 import subprocess
@@ -16,9 +17,21 @@ from netstring import Netstring
 # Default Baresip host
 baresipHost = "localhost"
 
+def isFfmpegRunning():
+    """At least on ffmpeg is actif and not zombie"""
+    for proc in psutil.process_iter(attrs=['name', 'status']):
+        if proc.info['name'] == "ffmpeg" and proc.info['status'] not in ["zombie", "stopped"]:
+            return True
+    return False
+
 def exit_handler():
+    print("Cleaning up...")
     subprocess.run(['echo "/quit" | netcat -q 1 127.0.0.1 5555'],
              shell=True)
+    os.system("killall -SIGINT ffmpeg");
+    while isFfmpegRunning():
+        print("FFmpeg still running...")
+        time.sleep(1)
 
 atexit.register(exit_handler)
 signal.signal(signal.SIGTERM, exit_handler)
@@ -118,11 +131,24 @@ def event_handler(data, args):
             args['browsing'].userInputs.put('s')
             args['browsing'].screenShared = False
 
-# Start event handler loop
-ns = Netstring(baresipHost, 4444)
+    if data['type'] == 'CHAT_INPUT':
+        if 'text' in data:
+            print('Received chat message: '+ data['text'], flush=True)
+            args['browsing'].chatMsg.put(data['text'])
+        if 'action' in data:
+            print('Received chat action: '+ data['action'], flush=True)
+            if data['action'] == 'toggle':
+                args['browsing'].userInputs.put('c')
 
 argDict = {'browsing':browsingObj(dispWidth, dispHeight, inputs['room'])}
 
+if os.environ.get('MAIN_APP') != 'baresip':
+    argDict['browsing'].name = os.environ.get('MAIN_APP')
+    browseThread = threading.Thread(target=browse, args=(argDict,))
+    browseThread.start()
+
+# Start event handler loop
+ns = Netstring(baresipHost, 4444)
 ns.getEvents(event_handler, argDict)
 
 # Terminate

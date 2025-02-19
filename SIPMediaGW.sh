@@ -7,10 +7,17 @@ trap cleanup SIGINT SIGQUIT SIGTERM
 
 unset room prefix loop
 
-while getopts r:f:p:l opt; do
+while getopts d:g:p:r:t:u:a:m:w:l opt; do
     case $opt in
-            r) room=$OPTARG ;;
+            d) dial_uri=$OPTARG ;;
+            g) gw_name=$OPTARG ;;
             p) prefix=$OPTARG ;;
+            r) room=$OPTARG ;;
+            t) timeout=$OPTARG ;;
+            u) rtmp_dst=$OPTARG ;;
+            a) api_key=$OPTARG ;;
+            m) user_mail=$OPTARG ;;
+            w) webrtc_domain=$OPTARG ;;
             l) loop=1 ;;
             *)
                 echo 'Error in command line parsing' >&2
@@ -23,7 +30,6 @@ shift "$(( OPTIND - 1 ))"
 source <(grep = .env)
 
 lockFilePrefix="sipmediagw"
-gwNamePrefix="gw"
 
 lockGw() {
     maxGwNum=$(echo "$(nproc)/$CPU_PER_GW" | bc )
@@ -42,15 +48,15 @@ lockGw() {
 
 checkGwStatus() {
     # 5 seconds timeout before exit
-    timeOut=5
+    timeOut=$2
     timer=0
     state="$(docker container exec  $1  netstat -t | grep :4444 | grep -c ESTABLISHED)"
-    while [[ ($state != "2") && ("$timer" < $timeOut) ]] ; do
+    while [[ ($state != "2") && ($timer -lt $timeOut) ]] ; do
         timer=$(($timer + 1))
         state="$(docker container exec  $1  netstat -t | grep :4444 | grep -c ESTABLISHED)"
         sleep 1
     done
-    if [ "$timer" = $timeOut ]; then
+    if [ $timer -eq $timeOut ]; then
         echo "{'res':'error','type':'The gateway failed to launch'}"
         exit 1
     fi
@@ -65,23 +71,56 @@ if [[ -z "$id" ]]; then
 fi
 
 restart="no"
-if [[ "$loop" ]]; then
-    restart="unless-stopped"
+check_reg="no"
+if [[ "$MAIN_APP" == "baresip" ]]; then
+	if [[ "$loop" ]]; then
+		restart="unless-stopped"
+	else
+		check_reg="yes"
+	fi
 fi
 
+docker container prune --force > /dev/null
+
 ### launch the gateway ###
-gwName="gw"$id
 RESTART=$restart \
+CHECK_REG=$check_reg \
 HOST_TZ=$(cat /etc/timezone) \
+HOST_IP=$(hostname -I | awk '{print $1}') \
 ROOM=$room \
+GW_NAME=$gw_name \
+DOMAIN=$webrtc_domain \
+RTMP_DST=$rtmp_dst \
+API_KEY=$api_key \
+USER_MAIL=$user_mail \
 PREFIX=$prefix \
 ID=$id \
-docker compose -p ${gwName} up -d --force-recreate --remove-orphans gw
+docker compose -p ${room:-"gw"$id} up -d --force-recreate --remove-orphans gw
 
-checkGwStatus $gwName
-sipUri=$(docker container exec gw$id  sh -c "cat /var/.baresip/accounts |
-                                           sed 's/.*<//; s/;.*//'")
-echo "{'res':'ok', 'uri':'$sipUri'}"
+checkGwStatus "gw"$id ${timeout:-10}
+
+MAIN_APP=$(docker exec gw0 sh -c 'echo $MAIN_APP')
+
+if [ "$MAIN_APP" == "baresip" ]; then
+    sipUri=$(docker exec gw$id sh -c 'cat /var/.baresip/accounts |
+                                      sed "s/.*<//; s/;.*//"')
+    echo "{'res':'ok', 'app': '$MAIN_APP', 'uri':'$sipUri'}"
+    if [[ "$dial_uri" ]]; then
+        gwIp=$(docker inspect -f \
+                '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+                "gw"$id)
+        echo '/dial '$dial_uri | netcat -q 1 $gwIp 5555
+    fi
+fi
+
+if [ "$MAIN_APP" == "streaming" ]; then
+    GW_PROXY=$(docker exec gw0 sh -c 'echo $GW_PROXY')
+    echo "{'res':'ok', 'app': '$MAIN_APP', 'uri': '$rtmp_dst'}"
+fi
+
+if [ "$MAIN_APP" == "recording" ]; then
+    echo "{'res':'ok', 'app': '$MAIN_APP', 'uri': '$push_file_url'}"
+fi
 
 # child process => lockFile locked until the container exits:
 ID=$id \
@@ -89,4 +128,6 @@ LOOP=$loop \
 nohup bash -c 'state="$(docker wait gw$ID)"
                while [[ "$state" == "0" && $LOOP ]] ; do
                    state="$(docker wait gw$ID)"
-               done' &> /dev/null &
+               done
+               docker restart gw$ID
+               docker container rm gw$ID' &> /dev/null &
