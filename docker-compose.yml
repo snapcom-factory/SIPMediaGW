@@ -8,12 +8,16 @@ services:
     image: "${DOCKER_IMAGE}"
     restart: ${RESTART}
     container_name: gw${ID}
+    networks:
+      default:
+        aliases:
+          - "${ROOM}"
     tmpfs:
       - /tmp
     volumes:
       - ./logs:/var/logs
     devices:
-      - /dev/video${ID}:/dev/video0
+      - /dev/${ID:+video}${ID:-null}:/dev/video0
       - /dev/snd:/dev/snd
     shm_size: '2gb'
     logging:
@@ -22,11 +26,6 @@ services:
         tag: "{{.ImageName}}/{{.Name}}"
     env_file:
       - .env
-      - deploy/.env_kamailio
-      - deploy/.env_turn
-    environment:
-      TZ: "${HOST_TZ}" # Time Zone
-      GW_ID: "${ID}"
-      SIP_NAME_PREFIX: "${PREFIX}"
-      ROOM_NAME: "${ROOM}"
+      - ./deploy/kamailio/config/.env_cred
+      - ./deploy/coturn/.env_cred
     stop_grace_period: 20s

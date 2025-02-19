@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import math
 import datetime as dt
+import dateutil.parser as du
 import json
 from contextlib import closing
 import mysql.connector as mysqlcon
@@ -108,6 +109,11 @@ class Scaler:
         runningCpuCount = 0
         for inst in instList:
             runningCpuCount+= inst['cpu_count']
+            if not inst['addr']['pub']:
+                now = dt.datetime.now(dt.timezone.utc)
+                start = du.parse(inst['start'])
+                if (now-start).total_seconds() > 600:
+                    self.csp.destroyInstances([inst['addr']['priv']])
         print('Number of running CPUs: {} \n'.format(runningCpuCount), flush=True)
 
     def scale(self, scaleTime=None, incallsNum=None):
@@ -146,15 +152,15 @@ class Scaler:
                     inCallNum = incallsNum if incallsNum else (currentCapacity - readyToCallNum )
                     minCapacity = thresholdTimeLine[th]['unlockedMin'] + inCallNum
                     if readyToCallNum < thresholdTimeLine[th]['unlockedMin']:
-                        self.upScale(self.config['cpu_per_gw']*
-                                                  (thresholdTimeLine[th]['unlockedMin'] - readyToCallNum))
+                        self.upScale(math.ceil(self.config['cpu_per_gw']*
+                                                  (thresholdTimeLine[th]['unlockedMin'] - readyToCallNum)))
                         currentCapacity = thresholdTimeLine[th]['unlockedMin'] + inCallNum
 
                     targetCapacity = max(minCapacity, inCallNum/thresholdTimeLine[th]['loadMax'])
                     capacityIncrease = math.ceil(targetCapacity - currentCapacity)
                     if capacityIncrease > 0:
                         # Upscale
-                        self.upScale(capacityIncrease*self.config['cpu_per_gw'])
+                        self.upScale(math.ceil(capacityIncrease*self.config['cpu_per_gw']))
                     if capacityIncrease < 0:
                         # Downscale
                         self.downScale(abs(capacityIncrease))

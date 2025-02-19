@@ -1,37 +1,63 @@
-Overview
---------
+# SIPMediaGW
+SIPMediaGW is a Docker-based set of open-source components that allow traditional video conferencing rooms to join Jitsi, Big Blue Button or LiveKit web conferences using SIP and RTP protocols.
 
-**SIPMediaGW** is a Docker based media gateway to be used on top of a web conferencing service (Jitsi Meet, BigBlueButton,...), in order to provide SIP (audio+video) access.
+<img src="docs/architecture.png">
 
+The room connector is compatible with all video devices supporting the SIP protocol. It has been tested with major devices from Polycom, Cisco, Huawei, and Aver.
 
-<img src="docs/architecture.png" width=80% height=80%>
-
-The Room Connector can be easily deployed thanks to the "All-in-one" [vagrant file](https://github.com/Renater/SIPMediaGW/blob/main/test/Vagrantfile) (requires Vagrant and VirtualBox).\
-To do so, simply run:
-
-	VAGRANT_VAGRANTFILE=test/Vagrantfile vagrant up
-
-> **Note**\
-> In this case, the provisioning is managed by a simple [shell script](https://github.com/Renater/SIPMediaGW/blob/main/test/provision.sh)
-
-Once the virtual machin is up, you can join a conference from your preferred SIP softphone:
-
-- **sip:your_conference_name@192.168.75.13** (Direct access)
-- **sip:0@192.168.75.13** (IVR access => Jitsi Meet only)
-
-In order to do that, you can use Baresip thanks to the provided [testing environment](https://github.com/Renater/SIPMediaGW/tree/main/test/baresip):
-	
-	./test/baresip/SIPCall.sh -u sip:test@192.168.75.1 -d 0@192.168.75.13
-
-Depending on [BROWSE_FILE](https://github.com/Renater/SIPMediaGW/blob/114ee4be29e0460132a0c018b8bbd94c72728522/.env#L12) and [WEBRTC_DOMAIN](https://github.com/Renater/SIPMediaGW/blob/114ee4be29e0460132a0c018b8bbd94c72728522/.env#L13) variables, the corresponding webconference is:
-- jitsi (default): https://meet.jit.si/your_conference_name \
-or
-- bigbluebutton: https://demo.bigbluebutton.org/rooms/your_conference_name/join
-
-Technical insights
---------
-- Architecture: [SIPMediaGW in-depth](https://github.com/Renater/SIPMediaGW/blob/main/docs/sipmediagw-in-depth.md)
-- Call flow: [SIPMediaGW call flow](https://github.com/Renater/SIPMediaGW/blob/main/docs/call_flow.md)
-- BFCP: [Screen sharing from meeting room to web users](https://github.com/Renater/SIPMediaGW/blob/main/docs/BFCP.png)
+SIPMediaGW relies on several open-source projects such as [Coturn](https://github.com/coturn/coturn), [Kamailio](https://github.com/kamailio/kamailio), [Homer](https://github.com/sipcapture/homer), [Baresip](https://github.com/baresip/baresip), [FFmpeg](https://github.com/FFmpeg/FFmpeg), [Pulseaudio](https://github.com/pulseaudio/pulseaudio), [ALSA](https://github.com/alsa-project/alsa-lib), [Video4Linux](https://linuxtv.org/), [Fluxbox](http://www.fluxbox.org/).
 
 
+## Features
+
+- Audio and video support
+- Inbound and outbound calls
+- Encrypted SIP and RTP traffic
+- Autoscaling logic for Cloud deployment
+- Content sharing via BFCP (Binary Floor Control Protocol)
+- Streaming capabilities via RTMP (Real-Time Messaging Protocol)
+
+## Usage
+### Installation
+- [Development environment](./docs/install_dev_env.md) 
+- [Production environment](./docs/install_prod_env.md)
+
+After installation, ensure that your firewall permits the following network traffic :
+
+<img src="./docs/firewall_rules.jpeg" alt="Firewall rules">
+
+### Testing 
+Once the services are up and running, you can join a conference from your preferred SIP softphone.
+Refer to the [testing section](./docs/testing.md) for more information.
+
+### Troubleshooting 
+The logs are handled by syslog of the host machine:
+```
+tail -f /var/log/syslog | grep mediagw
+```
+
+Inspect Kamailio database:
+```
+docker run -it --network=host --entrypoint mysql mysql -h 127.0.0.1 -u root -pdbrootpw kamailio -e "SELECT username, locked, to_stop FROM location"
+```
+
+For troubleshooting/monitoring purposes, real-time packet capture and visualization tools can be deployed as follows:
+
+```
+docker compose -f deploy/docker-compose.yml up -d --force-recreate heplify_server homer_webapp
+```
+**_NOTE:_**  Homer and SIP Capture tools are automatically deployed with the [Development environment](./docs/install_dev_env.md).
+
+## Contributing
+
+Contributions are always welcome.
+
+1. Fork the repository and create your branch from `main`.
+2. Open an issue to discuss proposed changes.
+3. Make your changes and ensure tests pass.
+4. Submit a pull request with a clear description of your changes.
+
+## License
+
+This project is licensed under the Apache 2.0 License. 
+See the [LICENSE](LICENSE) file for details.
