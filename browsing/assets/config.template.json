@@ -1,0 +1,14 @@
+{
+    "lang": "${IVR_LANG}",
+    "min_ivr_digit_length": "${IVR_DIGIT_LENGTH}",
+    "webrtc_domains": ${WEBRTC_DOMAINS},
+    "conf_mapper": {
+        "url": "${CONFMAPPER}"
+    },
+    "auth_token": {
+        "jwt": "${AUTH_TOKEN}",
+        "url": "${TOKEN_API_URL}",
+        "secure_room_regexp": "${ROOM_REGEXP}"
+    },
+    "ivr_tts": "${IVR_TTS}"
+}

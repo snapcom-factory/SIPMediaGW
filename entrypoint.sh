@@ -5,11 +5,15 @@ if [[ -z "$GW_ID" ]]; then
     exit 1
 fi
 
+if [[ -z "$ROOM_NAME" && "$MAIN_APP" != "baresip" ]]; then
+    echo "Must provide ROOM_NAME with $MAIN_APP"
+    exit 1
+fi
+
 ### Init logging ###
 HISTORY="/var/logs/gw"$GW_ID"_history"
 STATE="/var/logs/gw"$GW_ID"_state"
-touch $STATE
-echo "start_gw:$(date +'%b %d %H:%M:%S')"> $HISTORY
+> $STATE
 
 cleanup() {
     echo "Cleaning up..."
@@ -23,7 +27,12 @@ cleanup() {
 
 trap 'cleanup | logParse -p "Trap"' SIGINT SIGQUIT SIGTERM EXIT
 
-check_Xvfb() {
+### Assets download ###
+if [[ -n "$ASSETS_URL" ]]; then
+    wget -qO- "$ASSETS_URL" | tar xvJ -C /var/browsing/assets | logParse -p "Assets"
+fi
+
+checkXvfb() {
     # 5 seconds timeout before exit
     timeOut=5
     timer=0
@@ -39,36 +48,69 @@ check_Xvfb() {
     fi
 }
 
-check_v4l2() {
+checkEventSrv() {
     # 5 seconds timeout before exit
     timeOut=5
     timer=0
-    state=$(grep -q $1 $STATE; echo $?)
-    while [[ ($state == "1") && ($timer -lt $timeOut) ]]; do
+    state=$(netstat -a | grep :4444 | grep -c LISTEN)
+    while [[ ($state != "1") && ($timer -lt $timeOut) ]] ; do
         timer=$(($timer + 1))
+        state=$(netstat -a | grep :4444 | grep -c LISTEN)
         sleep 1
-        state=$(grep -q $1 $STATE; echo $?)
     done
     if [ $timer -eq $timeOut ]; then
-        echo "V4l2 loopback failed to launch" | logParse -p "V4l2"
+        echo "The gateway failed to launch" | logParse -p "EventSrv"
         exit 1
     fi
 }
 
-if [ "$MAIN_APP" == "recording" ]; then
-    for file in /var/recording/*.mp4; do
-        if [ -f "$file" ]; then
-            echo "Send and remove file: "$file | logParse -p "FileSender"
-            exec python3 /var/recording/filesender.py \
-                 -u $USER_MAIL -r $USER_MAIL -a $API_KEY $file \
-                 1> >( logParse -p "FileSender") \
-                 2> >( logParse -p "FileSender")
-            rm "$file"
-        fi
-    done
-    if [ -f "$file" ]; then
-        exit 1
+envsubst < /var/browsing/assets/config.template.json > /var/browsing/assets/config.json
+
+if [[ "$MAIN_APP" == "recording" && $(ls /var/recording/*.mp4 2>/dev/null) ]]; then
+
+    firstRec=$(ls -rt /var/recording/*.mp4 | head -n 1)
+    DATE_TIME=$(TZ=$TZ stat --format='%W' "$firstRec" | awk '{print strftime("%Y_%m_%d_%H%M", $1)}')
+
+    FINAL_VIDEO="RendezVous_$DATE_TIME.mp4"
+
+    if [ "$WITH_TRANSCRIPT" == "true" ]; then
+        python3 /var/transcript/transcript.py 1> >( logParse -p "Transcript") \
+                                              2> >( logParse -p "Transcript")
+
+        FINAL_TRANSCRIPT="RendezVous_$DATE_TIME.srt"
+        mv /var/recording/final_transcript.srt "/var/recording/"$FINAL_TRANSCRIPT
     fi
+
+    # Generate mp4 file list for concatenation
+    > "/var/recording/segments_list.txt"
+    for f in /var/recording/segment_*.mp4; do
+        echo "file '$f'" >> "/var/recording/segments_list.txt"
+    done
+
+    # Concatenate segments into one file
+    ffmpeg -y -f concat -safe 0 -i "/var/recording/segments_list.txt" -c copy "/var/recording/$FINAL_VIDEO"
+    rm /var/recording/segment*.mp4
+    rm /var/recording/segment*.txt
+
+    echo "Processing finished : video merged in $FINAL_VIDEO and transcriptions in $FINAL_TRANSCRIPT"
+
+    cd /var/recording
+    {
+        python3 filesender.py \
+                -u $FS_USER_MAIL -r $FS_RECIPIENT_MAIL -a $FS_API_KEY \
+                $FINAL_VIDEO $FINAL_TRANSCRIPT \
+                1> >( logParse -p "FileSender") \
+                2> >( logParse -p "FileSender") && \
+        rm $FINAL_VIDEO $FINAL_TRANSCRIPT && \
+        echo "Files sent and removed" | logParse -p "FileSender"
+    } || {
+        mv $FINAL_VIDEO $FINAL_TRANSCRIPT /var/logs && \
+        echo "Files moved in log directory" | logParse -p "FileCopy";
+    }
+    exit 1
+else
+    echo "start_gw:$(TZ=$TZ date +'%b %d %H:%M:%S')"> $HISTORY
+    echo "main_app:$MAIN_APP" > $HISTORY
 fi
 
 ### Configure audio devices ###
@@ -109,8 +151,8 @@ Xvfb :$SERVERNUM1 -screen 0 $VID_SIZE_WEBRTC"x"$PIX_DEPTH \
      +extension RANDR -noreset| logParse -p "Xvfb" &
 
 ### Check if Xvfb server is ready ###
-check_Xvfb $SERVERNUM0
-check_Xvfb $SERVERNUM1
+checkXvfb $SERVERNUM0
+checkXvfb $SERVERNUM1
 
 DISPLAY=:$SERVERNUM0 xrandr --setmonitor screen0 \
         $VID_W_SIP"/640x"$VID_H_SIP"/360+0+0" screen | logParse -p "xrandr"
@@ -123,17 +165,20 @@ DISPLAY=:$SERVERNUM0 unclutter -idle 1 &
 ### Main application ###
 source $MAIN_APP"/"$MAIN_APP".sh"
 
-### Check if video device is ready ###
-check_v4l2 "/dev/video0"
+if [ "$WITH_TRANSCRIPT" == "true" ]; then
+    exec python3 transcript/transcript.py 1> >( logParse -p "Transcript") \
+                                          2> >( logParse -p "Transcript") &
+fi
+
+### Check if event server is ready ###
+checkEventSrv
 
 ### Event handler ###
 if [[ -n "$ROOM_NAME" ]]; then
     roomParam="-r "$ROOM_NAME
 fi
-cp "./browsing/"$BROWSE_FILE src
-DISPLAY=:$SERVERNUM0 exec python3 src/event_handler.py -b `pwd`"/browsing/"$BROWSE_FILE \
-                                                       -s $VID_SIZE_APP \
+
+DISPLAY=:$SERVERNUM0 exec python3 src/event_handler.py -s $VID_SIZE_APP \
                                                        $roomParam $fromUri \
                           1> >( logParse -p "Event" -i $HISTORY )
-
 

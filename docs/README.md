@@ -9,9 +9,10 @@ This file serves as a navigational guide for all the documentation available in 
 3. [Production Deployment](#production-deployment)
 4. [Firewall Configuration](#firewall-configuration)
 5. [SIP Call Flow](#sip-call-flow)
-6. [Performance Metrics](#performance-metrics)
-7. [API Documentation](#api-documentation)
-8. [Testing Guide](#testing-guide)
+6. [Hosting server requirements](#hosting-server-requirements)
+7. [Auto-scaling](#auto-scaling)
+8. [API Documentation](#api-documentation)
+9. [Testing Guide](#testing-guide)
 10. [FAQ](#faq)
 
 ---
@@ -53,10 +54,17 @@ This file serves as a navigational guide for all the documentation available in 
 
 ---
 
-### Hosting server specifications
+### Hosting server requirements
 
 📄 [CPU_consumption.md](https://github.com/Renater/SIPMediaGW/blob/main/docs/CPU_consumption.md)  
 **Description**: Insights on CPU usage (detailed based on the type of processing).
+
+---
+
+### Auto-scaling
+
+📄 [scaler_logic.md](https://github.com/Renater/SIPMediaGW/blob/main/docs/scaler_logic.md)  
+**Description**: SIPMediaGW auto-scaling mechanisms.
 
 ---
 

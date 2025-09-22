@@ -1,0 +1,13 @@
+services:
+
+  transcript:
+    image: transcript4sipmediagw
+    build:
+      context: ./transcript
+    container_name: transcript${ID}
+    networks:
+      - default
+    logging:
+      driver: syslog
+      options:
+        tag: "{{.ImageName}}/{{.Name}}"

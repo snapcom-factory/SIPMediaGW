@@ -5,6 +5,11 @@ SIPMediaGW is a Docker-based set of open-source components that allow traditiona
 
 The room connector is compatible with all video devices supporting the SIP protocol. It has been tested with major devices from Polycom, Cisco, Huawei, and Aver.
 
+<p align="center">
+<img src="docs/ivr1.png" width="640">
+<img src="docs/ivr2.png" width="640">
+</p>
+
 SIPMediaGW relies on several open-source projects such as [Coturn](https://github.com/coturn/coturn), [Kamailio](https://github.com/kamailio/kamailio), [Homer](https://github.com/sipcapture/homer), [Baresip](https://github.com/baresip/baresip), [FFmpeg](https://github.com/FFmpeg/FFmpeg), [Pulseaudio](https://github.com/pulseaudio/pulseaudio), [ALSA](https://github.com/alsa-project/alsa-lib), [Video4Linux](https://linuxtv.org/), [Fluxbox](http://www.fluxbox.org/).
 
 
@@ -25,6 +30,12 @@ SIPMediaGW relies on several open-source projects such as [Coturn](https://githu
 After installation, ensure that your firewall permits the following network traffic :
 
 <img src="./docs/firewall_rules.jpeg" alt="Firewall rules">
+
+### Configuration
+- [SIPMediaGW](./.env)
+- [Kamailio](./deploy/.env_kamailio)
+- [Coturn](./deploy/.env_turn)
+- SIPCAPTURE: [HOMER](./deploy/.env_homer), [HEP](./deploy/.env_hep)
 
 ### Testing 
 Once the services are up and running, you can join a conference from your preferred SIP softphone.
@@ -48,14 +59,9 @@ docker compose -f deploy/docker-compose.yml up -d --force-recreate heplify_serve
 ```
 **_NOTE:_**  Homer and SIP Capture tools are automatically deployed with the [Development environment](./docs/install_dev_env.md).
 
-## Contributing
+## Documentation
 
-Contributions are always welcome.
-
-1. Fork the repository and create your branch from `main`.
-2. Open an issue to discuss proposed changes.
-3. Make your changes and ensure tests pass.
-4. Submit a pull request with a clear description of your changes.
+See the [Documentation index](./docs/README.md) for details.
 
 ## License
 
