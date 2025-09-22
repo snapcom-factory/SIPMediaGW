@@ -34,26 +34,28 @@ class Start:
         web.header('Content-Type', 'application/json')
         gwSubProc = ['./SIPMediaGW.sh']
         if 'room' in data.keys() and data['room'] != '0':
-            gwSubProc.append('-r%s' % data['room'])
+            gwSubProc.extend(['-r', data['room']])
         else:
             web.ctx.status = '400 Bad Request'
             return json.dumps({"Error": "a room name must be specified"})
-        if 'from' in data.keys():
-            gwSubProc.append('-f%s' % data['from'])
-        if 'prefix' in data.keys():
-            gwSubProc.append('-p%s' % data['prefix'])
-        if 'domain' in data.keys():
-            gwSubProc.append('-w%s' % data['domain'])
-        if 'rtmpDst' in data.keys():
-            gwSubProc.append('-u%s' % data['rtmpDst'])
-        if 'dial' in data.keys():
-            gwSubProc.append('-d%s' % data['dial'])
-        if 'loop' in data.keys():
-            gwSubProc.append('-l%s')
-        if 'apiKey' in data.keys():
-            gwSubProc.append('-a%s' % data['apiKey'])
-        if 'userMail' in data.keys():
-            gwSubProc.append('-m%s' % data['userMail'])
+        if 'from' in data:
+            gwSubProc.extend(['-f', data['from']])
+        if 'prefix' in data:
+            gwSubProc.extend(['-p', data['prefix']])
+        if 'domain' in data:
+            gwSubProc.extend(['-w', data['domain']])
+        if 'rtmpDst' in data:
+            gwSubProc.extend(['-u', data['rtmpDst']])
+        if 'dial' in data:
+            gwSubProc.extend(['-d', data['dial']])
+        if 'loop' in data and data['loop']:
+            gwSubProc.append('-l')
+        if 'transcript' in data and data['transcript']:
+            gwSubProc.append('-s')
+        if 'apiKey' in data:
+            gwSubProc.extend(['-k', data['apiKey']])
+        if 'recipientMail' in data:
+            gwSubProc.extend(['-m', data['recipientMail']])
 
         filePath = os.path.dirname(__file__)
         print(gwSubProc)
@@ -65,19 +67,99 @@ class Start:
         web.ctx.status = '200 OK'
         return json.dumps({"status": "success", "details": resJson})
 
+class Progress:
+    @authorize
+    def GET(self, args=None):
+        data = web.input()
+        web.header('Content-Type', 'application/json')
+        #ipdb.set_trace()
+        if 'room' in data.keys() and data['room'] != '0':
+            try:
+                gwSubProc = ['docker', 'compose', '-p', data['room'], 'ps', '--format', 'json']
+                res = subprocess.Popen(gwSubProc, cwd='.', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = res.communicate()
+                decoded = out.decode('utf-8').strip()
+                try:
+                    parsed = json.loads(decoded)
+                    if isinstance(parsed, dict):
+                        result = [parsed]
+                    elif isinstance(parsed, list):
+                        result = parsed
+                    else:
+                        raise ValueError("Unexpected format")
+                except json.JSONDecodeError:
+                    result = [json.loads(line) for line in decoded.split('\n') if line.strip()]
+                resp = {"status": "success"}
+                web.ctx.status = '200 OK'
+                if not result:
+                    resp['gw_state'] = "down"
+                    return json.dumps(resp)
+
+                gwData = next((c for c in result if c.get("Name", "").startswith("gw")), None)
+                gwName = gwData['Name']
+                # Recording progress
+                gwSubProc = ['docker', 'exec', gwName,
+                             'sh', '-c',
+                             ('[ "$MAIN_APP" = "recording" ] && '
+                              'pid=$(pgrep -o ffmpeg) && '
+                              '[ -n "$pid" ] && '
+                              'ps -p $pid -o etimes= | '
+                              'awk \'{ sec=$1; h=int(sec/3600); m=int((sec%3600)/60); s=sec%60; '
+                              'printf "%02d:%02d:%02d", h, m, s }\'')]
+                res = subprocess.Popen(gwSubProc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = res.communicate()
+                recordElapsed = out.decode()
+                if recordElapsed:
+                    resp["recording_duration"] = recordElapsed
+                gwSubProc = ['docker', 'exec', gwName, 'sh', '-c', 'echo $WITH_TRANSCRIPT']
+                res = subprocess.Popen(gwSubProc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = res.communicate()
+                withTranscript = out.decode()
+                if withTranscript == 'true':
+                    # Transcript progress
+                    gwSubProc = ['docker', 'exec', gwName, 'sh', '-c', 'ls /var/recording/*.mp4']
+                    res = subprocess.Popen(gwSubProc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    out, err = res.communicate()
+                    mp4List = out.decode().split()
+                    processedPercent = (
+                        f"{(sum(f.endswith('.processed.mp4') for f in mp4List) / len(mp4List) * 100):.0f}%"
+                        if mp4List else "0%"
+                    )
+                    resp["transcript_progress"] = processedPercent
+                return json.dumps(resp)
+            except:
+                web.ctx.status = '404 Not Found'
+                return json.dumps({"Error": "something wrong happened"})
+        else:
+            web.ctx.status = '400 Bad Request'
+            return json.dumps({"Error": "a room name must be specified"})
+
 class Stop:
     @authorize
     def GET(self, args=None):
         data = web.input()
         resJson = {}
         web.header('Content-Type', 'application/json')
-        gwSubProc = ['docker', 'compose']
         if 'room' in data.keys() and data['room'] != '0':
-            gwSubProc.append('-p%s' % data['room'])
+            gwSubProc = ['docker', 'compose', 'ls','--format', 'json', '-q' ]
+            res = subprocess.Popen(gwSubProc, cwd='.', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            res.wait()
+            resStr = res.stdout.read().decode('utf-8')
+            projects=resStr.splitlines()
+            if data['room'] in projects:
+                gwSubProc = ['docker', 'compose']
+                gwSubProc.extend(['-p', data['room']])
+            else:
+                web.ctx.status = '400 Bad Request'
+                return json.dumps({"Error": "no running container for room={}".format(data['room'])})
         else:
             web.ctx.status = '400 Bad Request'
             return json.dumps({"Error": "a room name must be specified"})
-        gwSubProc.append('stop')
+        if 'force' in data.keys() and data['force']:
+            gwSubProc.append('down')
+        else:
+            gwSubProc.append('stop')
+            gwSubProc.append('gw')
         filePath = os.path.dirname(__file__)
         print(gwSubProc)
         res = subprocess.Popen(gwSubProc, cwd=filePath, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -98,7 +180,7 @@ class Stop:
 class Chat:
     def forwardCommand(self, inDict, room):
         msgSubProc = ['docker', 'compose', 'run', '--rm', '--entrypoint', '/bin/sh', 'gw', '-c']
-        msgSubProc.append("echo '{}' | netcat -q 1 {} 4444".format(inDict, room))
+        msgSubProc.append("echo '{}:{},'| netcat -q 1 {} 4444".format(len(inDict),inDict, room))
         filePath = os.path.dirname(__file__)
         print(msgSubProc)
         res = subprocess.Popen(msgSubProc, cwd=filePath, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -144,17 +226,19 @@ class Chat:
             web.ctx.status = '400 Bad Request'
             return json.dumps({"Error": "a room name must be specified"})
         if 'msg' in data:
-            msg = data['msg']
+            msg = data['msg'].encode('utf-8')
         else:
             web.ctx.status = '400 Bad Request'
             return json.dumps({"Error": "message missing or not readable"})
-        msgDict = '{{"event":"message", "type":"CHAT_INPUT", "text": "{}" }}'.format(msg)
+        msgDict = '{{"event":"message", "type":"CHAT_INPUT", "text": "{}"}}'.format(msg)
         msgDict = msgDict.replace('\n', '\\n')
+        msgDict = msgDict.replace("'",'\\"')
         return self.forwardCommand(msgDict, room)
 
 
 urls = ("/start", "Start",
         "/stop", "Stop",
+        "/progress", "Progress",
         "/chat", "Chat")
 
 application = web.application(urls, globals()).wsgifunc()
