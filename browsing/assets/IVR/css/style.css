@@ -3,7 +3,6 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
   height: 100vh;
   font-size: 1.5em;
   margin: 0;
@@ -15,27 +14,45 @@ div.header-logo {
   width: 100%;
 }
 
-div.centered {
-  max-width: 480px;
-  width: auto;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 10rem;
-  color: black;
-  padding: 2rem 1rem 2rem 2rem;
-  text-align: center;
-  line-height: 2rem;
+#main {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-#logos {
+#domains {
   height: 150px;
   width: 100%;
   display: flex;
   gap: 100px;
   justify-content: center;
   align-items: center;
+  margin-bottom: 100px;
   img {
     max-height: 70px;
+  }
+
+  .domain-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    h3 {
+      margin: 0;
+      color: rgb(10, 118, 246);
+    }
+  }
+}
+
+#digitsLengthMessage {
+  .ok:before {
+    content: "\2713";
+    margin-right: 5px;
+  }
+  .nok:before {
+    content: "\2715";
+    margin-right: 5px;
   }
 }
 
@@ -65,7 +82,6 @@ div.centered {
 }
 
 #status {
-  /* color: #cccc33; */
   font-weight: normal;
   font-size: 1em;
   text-align: center;
@@ -94,25 +110,4 @@ div.centered {
 .hidden {
   opacity: 0;
   pointer-events: none;
-}
-
-#domains {
-  margin-bottom: 1.5em;
-  text-align: left;
-  font-size: 1em;
-  line-height: 1.4em;
-  border: 1px solid lightgray;
-  padding: 0.8em 1em;
-  max-width: 700px;
-  border-radius: 6px;
-}
-
-#domains .domain-item {
-  margin: 0.2em 0;
-}
-
-#domains .domain-id {
-  color: rgb(10, 118, 246);
-  font-weight: bold;
-  margin-right: 0.5em;
 }
