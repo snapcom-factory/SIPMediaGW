@@ -1,17 +1,51 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <title>Menu IVR</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-
-  <div id="message"></div>
-  <div id="domains" class="hidden"></div>
-  <div id="digits" contenteditable="true" spellcheck="false">_____</div>
-  <div id="status"></div>
-
-  <script type="module" src="ivr.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Menu IVR</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link type="text/css" rel="stylesheet" href="css/dsfr.min.css" />
+  </head>
+  <body>
+    <div class="header-logo">
+      <header class="fr-header" role="banner">
+        <div class="fr-header__body">
+          <div class="fr-container">
+            <div class="fr-header__body-row">
+              <div class="fr-header__brand fr-enlarge-link">
+                <div class="fr-header__brand-top">
+                  <div class="fr-header__logo">
+                    <a
+                      href="/"
+                      title="République Française"
+                      target="_self"
+                      class="fr-link--md"
+                    >
+                      <p class="fr-logo">République<br />Française</p>
+                    </a>
+                  </div>
+                  <div class="fr-header__navbar">
+                    <button
+                      type="button"
+                      class="fr-btn--menu fr-btn"
+                      aria-label="ouvrir la navigation"
+                    ></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+    </div>
+    <div>
+      <div id="title" style="margin-bottom: 60px; text-align: center"></div>
+      <div id="message"></div>
+      <div id="domains" class="hidden"></div>
+      <div id="digits" contenteditable="true" spellcheck="false">_____</div>
+      <div id="status"></div>
+    </div>
+    <div id="logos"></div>
+    <script type="module" src="ivr.js"></script>
+  </body>
 </html>

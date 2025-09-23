@@ -1,16 +1,42 @@
 body {
-  background: #000;
-  color: #0f0;
   font-family: monospace, monospace;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   height: 100vh;
   font-size: 1.5em;
   margin: 0;
   padding: 20px;
   user-select: none;
+}
+
+div.header-logo {
+  width: 100%;
+}
+
+div.centered {
+  max-width: 480px;
+  width: auto;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10rem;
+  color: black;
+  padding: 2rem 1rem 2rem 2rem;
+  text-align: center;
+  line-height: 2rem;
+}
+
+#logos {
+  height: 150px;
+  width: 100%;
+  display: flex;
+  gap: 100px;
+  justify-content: center;
+  align-items: center;
+  img {
+    max-height: 70px;
+  }
 }
 
 #message {
@@ -27,7 +53,7 @@ body {
   min-width: 12ch;
   text-align: center;
   font-size: 2em;
-  color: #0f0;
+  color: rgb(10, 118, 246);
   caret-color: transparent;
   user-select: none;
 }
@@ -39,7 +65,7 @@ body {
 }
 
 #status {
-  color: #cccc33;
+  /* color: #cccc33; */
   font-weight: normal;
   font-size: 1em;
   text-align: center;
@@ -75,10 +101,10 @@ body {
   text-align: left;
   font-size: 1em;
   line-height: 1.4em;
-  color: #0f0;
-  border: 1px dashed #0f0;
+  border: 1px solid lightgray;
   padding: 0.8em 1em;
   max-width: 700px;
+  border-radius: 6px;
 }
 
 #domains .domain-item {
@@ -86,7 +112,7 @@ body {
 }
 
 #domains .domain-id {
-  color: #cccc33;
+  color: rgb(10, 118, 246);
   font-weight: bold;
   margin-right: 0.5em;
 }
