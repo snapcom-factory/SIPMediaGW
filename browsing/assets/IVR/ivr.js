@@ -24,6 +24,8 @@ const messages = {
     invalid: (error) => `Le code n'est pas valide ('${error}')`,
     incomplete: (count, expected) =>
       `Le code est trop court (${count}/${expected})`,
+    expectedLength: (count, expected) =>
+      `Un minimum de ${expected} chiffres (${count}/${expected})`,
     error: (reason) => `Erreur : ${reason}`,
     chosenDomain: (id, name) => `Plateforme sélectionnée (${id}) : ${name}`,
   },
@@ -32,6 +34,8 @@ const messages = {
     invalid: (error) => `The code is not valid ('${error}')`,
     incomplete: (count, expected) =>
       `The code is too short (${count}/${expected})`,
+    expectedLength: (count, expected) =>
+      `A minimum of ${expected} digits (${count}/${expected})`,
     error: (reason) => `Error: ${reason}`,
     chosenDomain: (id, name) => `Platform selected (${id}): ${name}`,
   },
@@ -52,7 +56,7 @@ function initIVR(config) {
   const digitsEl = document.getElementById("digits");
   const statusEl = document.getElementById("status");
   const domainsEl = document.getElementById("domains");
-  const logosEl = document.getElementById("logos");
+  const digitsLengthMessageEl = document.getElementById("digitsLengthMessage");
 
   const lang = config["lang"] || "fr";
   const expectedLength = parseInt(config["min_ivr_digit_length"], 10) || 0;
@@ -66,19 +70,6 @@ function initIVR(config) {
 
   function showTitle() {
     titleEl.innerHTML = `<h1>${titles[lang].main}</h1><h2>${titles[lang].sub}</h2>`;
-  }
-
-  function showLogos() {
-    logosEl.innerHTML = Object.values(domains)
-      .map(
-        (d) => `
-        <div style="display:flex;align-items:center;gap:10px">
-        <h3 style="margin:0;color:rgb(10, 118, 246);">${d.id} - </h3>
-        <img alt="${d.name}" src="images/${d.key}.png"/>
-        </div>
-        `
-      )
-      .join("");
   }
 
   function parseDomains(raw) {
@@ -102,8 +93,9 @@ function initIVR(config) {
     digitsEl.textContent = [filled, empty].filter(Boolean).join(" ");
   }
 
-  function showStatus(msg) {
+  function showStatus(msg, color) {
     statusEl.textContent = msg;
+    statusEl.style.color = color ? color : "#3a3a3a";
   }
 
   function playPromptAudio(type, lang) {
@@ -128,11 +120,16 @@ function initIVR(config) {
       domainsEl.innerHTML = Object.values(domains)
         .map(
           (d) =>
-            `<div class="domain-item"><span class="domain-id">${d.id}&nbsp;&nbsp;-</span> ${d.name}</div>`
+            `<div class="domain-item">
+            <div class="domain-logo">
+              <h3>${d.id} - </h3>
+              <img alt="${d.name}" src="images/${d.key}.png"/>
+              </div>
+              <span>${d.name}</span>
+            </div>`
         )
         .join("");
       showTitle();
-      showLogos();
       playPromptAudio("platform", lang);
     } else {
       messageEl.innerHTML = prompts[lang].room;
@@ -142,12 +139,27 @@ function initIVR(config) {
     }
   }
 
+  function handleIncomplete(inputDigits) {
+    const msg = messages[lang].expectedLength(
+      inputDigits.length,
+      expectedLength
+    );
+    const isLengthOk = inputDigits.length >= expectedLength;
+    digitsLengthMessageEl.innerHTML = `<span class="${
+      isLengthOk ? "ok" : "nok"
+    }" style="color: ${isLengthOk ? "#03bd5b" : "#d63626"}">${msg}</span>`;
+  }
+
   function handleInput(char) {
     if (/^[a-zA-Z0-9-]$/.test(char)) {
       if (stage === "domain") inputDigits = [char];
-      else inputDigits.push(char);
+      else {
+        inputDigits.push(char);
+        handleIncomplete(inputDigits);
+      }
     } else if (char === "*") {
       inputDigits.pop();
+      handleIncomplete(inputDigits);
     } else if (char === "#") {
       if (stage === "domain") {
         const domainId = parseInt(inputDigits.join(""), 10);
@@ -168,7 +180,7 @@ function initIVR(config) {
             showPrompt();
           }
         } else {
-          showStatus(messages[lang].invalid(inputDigits.join("")));
+          showStatus(messages[lang].invalid(inputDigits.join("")), "red");
         }
       } else if (stage === "room") {
         const roomId = inputDigits.join("");
@@ -182,6 +194,7 @@ function initIVR(config) {
             () => {
               console.log("Room retrieved successfully:", room.roomName);
               window.room = room;
+              digitsLengthMessageEl.style.display = "none";
               digitsEl.style.display = "none";
               messageEl.style.display = "none";
               statusEl.style.display = "none";
@@ -190,14 +203,15 @@ function initIVR(config) {
             },
             (errorReason) => {
               console.error("Error entering room:", errorReason.error);
-              showStatus(messages[lang].invalid(errorReason.error));
+              showStatus(messages[lang].invalid(errorReason.error), "red");
               digitsEl.style.visibility = "visible";
               showPrompt();
             }
           );
         } else {
           showStatus(
-            messages[lang].incomplete(inputDigits.length, expectedLength)
+            messages[lang].incomplete(inputDigits.length, expectedLength),
+            "red"
           );
           digitsEl.style.visibility = "visible";
           showPrompt();
