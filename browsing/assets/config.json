@@ -1,0 +1,27 @@
+{
+  "lang": "fr",
+  "min_ivr_digit_length": "5",
+  "webrtc_domains": {
+    "jitsi": {
+      "name": "Webconf de l'état",
+      "domain": "webconf.numerique.gouv.fr"
+    },
+    "visio": {
+      "name": "Visio (visio.numerique.gouv.fr)",
+      "domain": "visio.numerique.gouv.fr"
+    },
+    "teams": {
+      "name": "Teams (teams.microsoft.com)",
+      "domain": "teams.microsoft.com/meet/"
+    }
+  },
+  "conf_mapper": {
+    "url": ""
+  },
+  "auth_token": {
+    "jwt": "",
+    "url": "",
+    "secure_room_regexp": ""
+  },
+  "ivr_tts": ""
+}
