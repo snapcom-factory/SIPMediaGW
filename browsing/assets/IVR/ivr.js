@@ -5,16 +5,35 @@ const titles = {
   en: { main: "WebConférence de l'État", sub: "Audio, vidéo et chat" },
 };
 
+const serviceTitle = {
+  fr: "Visiby Connect",
+  en: "Visiby Connect",
+};
+
 const prompts = {
   fr: {
     domain:
       "Veuillez entrer le numéro de la plateforme suivi de #<br>(utilisez * pour corriger)",
-    room: "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
+    room: {
+      jitsi:
+        "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
+      visio:
+        "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
+      teams:
+        "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
+    },
   },
   en: {
     domain:
       "Please enter the platform number followed by #<br>(use * to correct)",
-    room: "Please enter your conference number followed by #<br>(use * to correct)",
+    room: {
+      jitsi:
+        "Please enter your conference number followed by #<br>(use * to correct)",
+      visio:
+        "Please enter your conference number followed by #<br>(use * to correct)",
+      teams:
+        "Please enter your conference number followed by #<br>(use * to correct)",
+    },
   },
 };
 
@@ -27,7 +46,12 @@ const messages = {
     expectedLength: (count, expected) =>
       `Un minimum de ${expected} chiffres (${count}/${expected})`,
     error: (reason) => `Erreur : ${reason}`,
-    chosenDomain: (id, name) => `Plateforme sélectionnée (${id}) : ${name}`,
+    chosenDomain: (id, name, key) =>
+      `
+      <div style="display:flex;align-items:center;gap:20px;">
+        <span>Plateforme sélectionnée (${id}): ${name}</span> 
+        <img style="height:50px;" alt="${name}" src="images/${key}.png" />
+      </div>`,
   },
   en: {
     valid: (code) => `Code validated: ${code}`,
@@ -37,7 +61,12 @@ const messages = {
     expectedLength: (count, expected) =>
       `A minimum of ${expected} digits (${count}/${expected})`,
     error: (reason) => `Error: ${reason}`,
-    chosenDomain: (id, name) => `Platform selected (${id}): ${name}`,
+    chosenDomain: (id, name, key) =>
+      `
+    <div style="display:flex;align-items:center;gap:20px;">
+      <span>Platform selected (${id}): ${name}</span> 
+      <img style="height:50px;" alt="${name}" src="images/${key}.png" />
+    </div>`,
   },
 };
 
@@ -52,6 +81,7 @@ fetch("../config.json")
 
 function initIVR(config) {
   const titleEl = document.getElementById("title");
+  const serviceTitleEl = document.getElementById("serviceTitle");
   const messageEl = document.getElementById("message");
   const digitsEl = document.getElementById("digits");
   const statusEl = document.getElementById("status");
@@ -70,6 +100,7 @@ function initIVR(config) {
 
   function showTitle() {
     titleEl.innerHTML = `<h1>${titles[lang].main}</h1><h2>${titles[lang].sub}</h2>`;
+    serviceTitleEl.innerHTML = `<h2>${serviceTitle[lang]}</h2>`;
   }
 
   function parseDomains(raw) {
@@ -94,7 +125,7 @@ function initIVR(config) {
   }
 
   function showStatus(msg, color) {
-    statusEl.textContent = msg;
+    statusEl.innerHTML = msg;
     statusEl.style.color = color ? color : "#3a3a3a";
   }
 
@@ -113,7 +144,11 @@ function initIVR(config) {
   }
 
   function showPrompt() {
-    if (messageEl.innerHTML === prompts[lang][stage]) return;
+    if (
+      messageEl.innerHTML === prompts?.[lang]?.[stage] ||
+      messageEl.innerHTML === prompts?.[lang]?.[stage]?.[selectedDomain?.key]
+    )
+      return;
     if (stage === "domain" && Object.keys(domains).length > 1) {
       messageEl.innerHTML = prompts[lang].domain;
       domainsEl.classList.remove("hidden");
@@ -132,7 +167,7 @@ function initIVR(config) {
       showTitle();
       playPromptAudio("platform", lang);
     } else {
-      messageEl.innerHTML = prompts[lang].room;
+      messageEl.innerHTML = prompts[lang].room?.[selectedDomain?.key];
       domainsEl.innerHTML = "";
       domainsEl.classList.add("hidden");
       playPromptAudio("conference", lang);
@@ -166,7 +201,11 @@ function initIVR(config) {
         if (!isNaN(domainId) && domains[domainId]) {
           selectedDomain = domains[domainId];
           showStatus(
-            messages[lang].chosenDomain(domainId, selectedDomain.name)
+            messages[lang].chosenDomain(
+              domainId,
+              selectedDomain.name,
+              selectedDomain.key
+            )
           );
           window.browsing = selectedDomain.key;
           inputDigits = [];
@@ -241,13 +280,19 @@ function initIVR(config) {
     if (found) {
       selectedDomain = found;
       (selectedDomain.id + "#").split("").forEach(handleInput);
-      showStatus(messages[lang].chosenDomain(found.id, found.name));
+      showStatus(messages[lang].chosenDomain(found.id, found.name, found.key));
     }
   } else if (urlDomainId && domains[urlDomainId]) {
     selectedDomain = domains[urlDomainId];
     (selectedDomain.id + "#").split("").forEach(handleInput);
     console.log(`Auto-selected domain (by id): ${selectedDomain.name}`);
-    showStatus(messages[lang].chosenDomain(urlDomainId, selectedDomain.name));
+    showStatus(
+      messages[lang].chosenDomain(
+        urlDomainId,
+        selectedDomain.name,
+        selectedDomain.key
+      )
+    );
   }
 
   if (!selectedDomain && Object.keys(domains).length === 1) {
