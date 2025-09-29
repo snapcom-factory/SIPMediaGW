@@ -238,6 +238,8 @@ function initIVR(config) {
               messageEl.style.display = "none";
               statusEl.style.display = "none";
               domainsEl.style.display = "none";
+              titleEl.style.display = "none";
+              serviceTitleEl.style.display = "none";
               document.removeEventListener("keydown", keyEvent);
             },
             (errorReason) => {
