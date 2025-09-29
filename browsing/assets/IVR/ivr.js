@@ -160,7 +160,7 @@ function initIVR(config) {
               <h3>${d.id} - </h3>
               <img alt="${d.name}" src="images/${d.key}.png"/>
               </div>
-              <span>${d.name}</span>
+              <div class="domain-name">${d.name}</div>
             </div>`
         )
         .join("");
