@@ -1,8 +1,8 @@
 import { Room } from "./room.js";
 
 const titles = {
-  fr: { main: "WebConférence de l'État", sub: "Audio, vidéo et chat" },
-  en: { main: "WebConférence de l'État", sub: "Audio, vidéo et chat" },
+  fr: { main: "Votre passerelle Renater", sub: "Audio, vidéo et chat" },
+  en: { main: "Votre passerelle Renater", sub: "Audio, vidéo et chat" },
 };
 
 const serviceTitle = {
