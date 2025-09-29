@@ -17,15 +17,17 @@ div.header-logo {
 
 #title {
   width: 100%;
-  margin: 5%;
+  /* margin: 5%; */
   text-align: center;
 }
 
 #main {
-  margin: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-around;
+  height: 100%;
+  margin-top: 5%;
 }
 
 #domains {
@@ -35,7 +37,7 @@ div.header-logo {
   gap: 100px;
   justify-content: center;
   align-items: center;
-  margin-bottom: 5%;
+  /* margin-bottom: 5%; */
   img {
     max-height: 70px;
   }
@@ -98,7 +100,7 @@ div.header-logo {
 }
 
 #message {
-  margin-bottom: 5%;
+  /* margin-bottom: 5%; */
   text-align: center;
   max-width: 600px;
   font-size: 1.2em;
@@ -107,7 +109,7 @@ div.header-logo {
 
 #digits {
   letter-spacing: 0.4em;
-  margin-bottom: 5%;
+  /* margin-bottom: 5%; */
   min-width: 12ch;
   text-align: center;
   font-size: 2em;
@@ -127,7 +129,7 @@ div.header-logo {
   font-size: 1em;
   text-align: center;
   min-height: 1.5em;
-  margin-top: 5%;
+  /* margin-top: 5%; */
   opacity: 0.8;
 }
 
