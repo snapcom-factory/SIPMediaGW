@@ -7,11 +7,11 @@
       "domain": "webconf.numerique.gouv.fr"
     },
     "visio": {
-      "name": "Visio (visio.numerique.gouv.fr)",
+      "name": "Visio",
       "domain": "visio.numerique.gouv.fr"
     },
     "teams": {
-      "name": "Teams (teams.microsoft.com)",
+      "name": "Teams",
       "domain": "teams.microsoft.com/meet/"
     }
   },

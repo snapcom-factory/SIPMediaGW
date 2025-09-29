@@ -156,11 +156,11 @@ function initIVR(config) {
         .map(
           (d) =>
             `<div class="domain-item">
-            <div class="domain-logo">
               <h3>${d.id} - </h3>
-              <img alt="${d.name}" src="images/${d.key}.png"/>
+              <div class="domain-logo">
+                <img alt="${d.name}" src="images/${d.key}.png"/>
+                <div class="domain-name">${d.name}</div>
               </div>
-              <div class="domain-name">${d.name}</div>
             </div>`
         )
         .join("");
