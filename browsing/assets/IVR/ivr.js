@@ -87,7 +87,8 @@ function initIVR(config) {
   const statusEl = document.getElementById("status");
   const domainsEl = document.getElementById("domains");
   const digitsLengthMessageEl = document.getElementById("digitsLengthMessage");
-
+  const poweredbyEl = document.getElementById("powerdBy");
+  const headerlogoEl = document.getElementById("header-logo");
   const lang = config["lang"] || "fr";
   const expectedLength = parseInt(config["min_ivr_digit_length"], 10) || 0;
   const domains = parseDomains(config["webrtc_domains"]);
@@ -240,6 +241,8 @@ function initIVR(config) {
               domainsEl.style.display = "none";
               titleEl.style.display = "none";
               serviceTitleEl.style.display = "none";
+              poweredbyEl.style.display = "none";
+              headerlogoEl.style.display = "none";
               document.removeEventListener("keydown", keyEvent);
             },
             (errorReason) => {
