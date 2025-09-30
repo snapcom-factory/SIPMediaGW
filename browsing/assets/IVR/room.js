@@ -40,7 +40,7 @@ export class Room {
         const authURL = this.config['auth_token']['url'];
 
         try {
-            if (mapperURL) {
+            if (mapperURL && /^\d+$/.test(String(this.roomId))) {
                 await this.getConferenceName(mapperURL, timeout, onError);
             }
             if (authURL) {
@@ -60,9 +60,8 @@ export class Room {
             this.fetchWithTimeout(url, { method: 'GET' }, timeout, onError)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.conference) {
-                        this.roomName = data['url'] || data['conference'].split('@')[0];
-                        this.mappedDomain = data['meeting_instance'] || data['conference'].split('@conference.')[1];
+                    if (data.name) {
+                        this.roomName = data.name;
                         resolve();
                     } else {
                         onError(data);
