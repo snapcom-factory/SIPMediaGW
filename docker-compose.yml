@@ -16,6 +16,7 @@ services:
       - /tmp
     volumes:
       - ./logs:/var/logs
+      - ./browsing:/var/browsing
     devices:
       - /dev/${ID:+video}${ID:-null}:/dev/video0
       - /dev/snd:/dev/snd
