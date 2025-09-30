@@ -1,7 +1,7 @@
 import { Room } from "./room.js";
 
 const titles = {
-  fr: { main: "Votre passerelle Renater", sub: "Audio, vidéo et chat" },
+  fr: { main: "Votre passerelle Visiby", sub: "Solution multi plateforme" },
   en: { main: "Votre passerelle Renater", sub: "Audio, vidéo et chat" },
 };
 
