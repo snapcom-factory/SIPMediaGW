@@ -136,7 +136,7 @@ class Browsing:
 
         def checkLoop():
             nonlocal singleStartTime
-            while True:
+            while self.driver.execute_script("return('getParticipantNum' in window.meeting)"):
                 try:
                     participantNum = self.driver.execute_script(
                         "return (window.meeting && window.meeting.getParticipantNum) ? window.meeting.getParticipantNum() : 1;"
@@ -145,7 +145,7 @@ class Browsing:
                     print(f"Error getting participant number: {e}", flush=True)
                     participantNum = None
 
-                if participantNum is not None and participantNum <= 1:
+                if participantNum  and participantNum <= 1:
                     if singleStartTime is None:
                         singleStartTime = time.time()
                     elif time.time() - singleStartTime >= thresholdSeconds:

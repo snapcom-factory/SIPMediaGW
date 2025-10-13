@@ -269,16 +269,57 @@ function initIVR(config) {
     showStatus("");
   }
 
-  function keyEvent(e) {
-    handleInput(e.key);
-  }
-  document.addEventListener("keydown", keyEvent);
+    function keyEvent(e) {
+        handleInput(e.key);
+    }
+    document.addEventListener('keydown', keyEvent);
 
-  // Auto-enter from URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlDomainId = urlParams.get("domainId");
-  const urlDomainKey = urlParams.get("domainKey");
-  const urlRoomId = urlParams.get("roomId");
+    // Auto-enter from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlDomainId = urlParams.get("domainId");
+    const urlDomainKey = urlParams.get("domainKey");
+    const urlRoomId = urlParams.get("roomId");
+    const urlMixedId = urlParams.get("mixedId");
+
+    if (urlMixedId) {
+        let d = null, r = null;
+        if (/^[1-9]$/.test(urlMixedId)) {
+            d = urlMixedId;
+        } else {
+            // Split on '#' or '.'
+            const parts = urlMixedId.split(/[#.]/);
+            if (parts.length === 2) {
+                [d, r] = parts;
+            } else {
+                r = urlMixedId;
+            }
+        }
+        if (r && !/^[0-9]$/.test(r)) pendingRoomId = r;
+        if (d && /^[1-9]$/.test(d)) {
+            if (domains[d]) {
+                selectedDomain = domains[d];
+                (selectedDomain.id + '#').split('').forEach(handleInput);
+                console.log(`Auto-selected domain (from mixedId): ${selectedDomain.name}`);
+                showStatus(messages[lang].chosenDomain(d, selectedDomain.name));
+            }
+        }
+    }
+
+    if (urlRoomId && urlRoomId !== '0') pendingRoomId = urlRoomId;
+
+    if (urlDomainKey) {
+        const found = Object.values(domains).find(d => d.key === urlDomainKey);
+        if (found) {
+            selectedDomain = found;
+            (selectedDomain.id + '#').split('').forEach(handleInput);
+            showStatus(messages[lang].chosenDomain(found.id, found.name));
+        }
+    } else if (urlDomainId && domains[urlDomainId]) {
+        selectedDomain = domains[urlDomainId];
+        (selectedDomain.id + '#').split('').forEach(handleInput);
+        console.log(`Auto-selected domain (by id): ${selectedDomain.name}`);
+        showStatus(messages[lang].chosenDomain(urlDomainId, selectedDomain.name));
+    }
 
   if (urlRoomId && urlRoomId !== "0") pendingRoomId = urlRoomId;
 
