@@ -1,3 +1,4 @@
 .vagrant/
 __pycache__
 logs/
+browsing/assets/config.json
