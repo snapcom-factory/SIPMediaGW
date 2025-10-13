@@ -41,7 +41,13 @@ class Teams {
             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
             nativeInputValueSetter.call(nameInput, this.displayName);
             nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-            console.log('[✓] Name field detected and filled');
+
+            const deviceSettings = await this.waitForElement("[id='prejoin-devicesettings-button']", { clickable: true }, 60000);
+            deviceSettings.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            const noiseSuppression = await this.waitForElement("[data-tid='background-suppression-switch']",
+                                                               { clickable: true }, 60000);
+            noiseSuppression.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
             console.log('[INFO] Submitting join form...');
             const joinButton = await this.waitForElement("[data-tid='prejoin-join-button']", { clickable: true }, 60000);
             joinButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -63,7 +69,7 @@ class Teams {
         if (key == "5")
             document.querySelector('button[id="roster-button"]').click();
         if (key == "s")
-            document.querySelector('button[id="share-button"]').click();
+            document.querySelector('button#share-button, button#screenshare-button').click();
             var logOutBtn = await this.waitForElement('[data-tid="share-screen-window-or-tab"]', { clickable: true }, 10000);
             logOutBtn.click();
     }
