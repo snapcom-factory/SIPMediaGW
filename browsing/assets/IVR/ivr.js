@@ -174,6 +174,31 @@ function initIVR(config) {
     const urlDomainId = urlParams.get("domainId");
     const urlDomainKey = urlParams.get("domainKey");
     const urlRoomId = urlParams.get("roomId");
+    const urlMixedId = urlParams.get("mixedId");
+
+    if (urlMixedId) {
+        let d = null, r = null;
+        if (/^[1-9]$/.test(urlMixedId)) {
+            d = urlMixedId;
+        } else {
+            // Split on '#' or '.'
+            const parts = urlMixedId.split(/[#.]/);
+            if (parts.length === 2) {
+                [d, r] = parts;
+            } else {
+                r = urlMixedId;
+            }
+        }
+        if (r && !/^[0-9]$/.test(r)) pendingRoomId = r;
+        if (d && /^[1-9]$/.test(d)) {
+            if (domains[d]) {
+                selectedDomain = domains[d];
+                (selectedDomain.id + '#').split('').forEach(handleInput);
+                console.log(`Auto-selected domain (from mixedId): ${selectedDomain.name}`);
+                showStatus(messages[lang].chosenDomain(d, selectedDomain.name));
+            }
+        }
+    }
 
     if (urlRoomId && urlRoomId !== '0') pendingRoomId = urlRoomId;
 
