@@ -17,6 +17,7 @@ services:
     volumes:
       - ./logs:/var/logs
       - ./browsing:/var/browsing
+      - ./src:/var/src
     devices:
       - /dev/${ID:+video}${ID:-null}:/dev/video0
       - /dev/snd:/dev/snd
