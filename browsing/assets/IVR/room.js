@@ -6,6 +6,7 @@ export class Room {
         this.roomToken = null;
         this.mappedDomain = null;
         this.meeting = null;
+        this.mailOwner = null;
         this.overlayTimeouts = {};
     }
 
@@ -38,10 +39,12 @@ export class Room {
         const mapperURL = confMapper.url;
         const timeout = 5000;
         const authURL = this.config['auth_token']['url'];
-
         try {
             if (mapperURL && /^\d+$/.test(String(this.roomId))) {
                 await this.getConferenceName(mapperURL, timeout, onError);
+            }
+            if(!this.mailOwner) {
+                this.roomToken = '';
             }
             if (authURL) {
                 await this.getConferenceToken(authURL, timeout, onError);
