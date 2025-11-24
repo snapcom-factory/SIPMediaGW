@@ -83,18 +83,18 @@ def event_handler(data, args):
 
     if data['type'] == 'CALL_ESTABLISHED':
         print(data, flush=True)
+        if data['remotevideodir'] == 'inactive':
+            os.environ['AUDIO_ONLY'] = 'true'
         displayName = ''
         if 'peerdisplayname' in data:
-            if not args['ivr'].roomName:
-                try:
-                    roomLen = int(data['peerdisplayname'].split('-', 1)[0])
-                    args['ivr'].mixedId = data['peerdisplayname'].split('-',1)[1][0:roomLen]
-                    print("Call prefix: "+args['ivr'].mixedId, flush=True)
-                    displayName = data['peerdisplayname'].split('-',1)[1][roomLen:]
-                except:
-                    displayName = data['peerdisplayname']
-            else:
-                print("Room name: "+args['ivr'].roomName, flush=True)
+            try:
+                if args['ivr'].roomName:
+                    print("Static room name (may be overwritten => ivr.js): "+args['ivr'].roomName, flush=True)
+                roomLen = int(data['peerdisplayname'].split('-', 1)[0])
+                args['ivr'].mixedId = data['peerdisplayname'].split('-',1)[1][0:roomLen]
+                print("Call prefix: "+args['ivr'].mixedId, flush=True)
+                displayName = data['peerdisplayname'].split('-',1)[1][roomLen:]
+            except:
                 displayName = data['peerdisplayname']
         if not displayName:
             displayName = data['peeruri'].split(';')[0].split(':')[1]

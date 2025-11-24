@@ -16,14 +16,20 @@ from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import TimeoutException
 import traceback
 
-class Teams (Browsing):
+class Teams(Browsing):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if os.environ.get('WITH_ALSA') == "true":
+            self.chromeOptions.add_argument('--alsa-input-device=hw:1,1')
+            self.chromeOptions.add_argument('--alsa-output-device=hw:0,0')
 
     def loadPage(self):
         self.driver.get("https://{}/{}".format(
             self.room['config']['webrtc_domain'],
             self.room['roomName'].replace('-', '?p=')
         ))
-        WebDriverWait(self.driver, 10).until(
+        WebDriverWait(self.driver, 60).until(
             EC.presence_of_element_located((By.TAG_NAME, "video"))
         )
 
