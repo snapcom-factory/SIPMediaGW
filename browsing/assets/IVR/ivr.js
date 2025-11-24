@@ -73,6 +73,10 @@ function initIVR(config) {
         statusEl.textContent = msg;
     }
 
+    function showDomainStatus(msg) {
+        document.getElementById("domain-status").textContent = msg;
+    }
+
     function playPromptAudio(type, lang) {
         if (!config.ivr_tts) return;
 
@@ -105,7 +109,7 @@ function initIVR(config) {
     }
 
     function handleInput(char) {
-        if (/^[a-zA-Z0-9-]$/.test(char)) {
+        if (/^[a-zA-Z0-9-_/]$/.test(char)) {
             if (stage === "domain") inputDigits = [char];
             else inputDigits.push(char);
         } else if (char === '*') {
@@ -115,7 +119,7 @@ function initIVR(config) {
                 const domainId = parseInt(inputDigits.join(''), 10);
                 if (!isNaN(domainId) && domains[domainId]) {
                     selectedDomain = domains[domainId];
-                    showStatus(messages[lang].chosenDomain(domainId, selectedDomain.name));
+                    showDomainStatus(messages[lang].chosenDomain(domainId, selectedDomain.name));
                     window.browsing = selectedDomain.key;
                     inputDigits = [];
                     stage = "room";
@@ -176,6 +180,8 @@ function initIVR(config) {
     const urlRoomId = urlParams.get("roomId");
     const urlMixedId = urlParams.get("mixedId");
 
+    if (urlRoomId && urlRoomId !== '0') pendingRoomId = urlRoomId;
+
     if (urlMixedId) {
         let d = null, r = null;
         if (/^[1-9]$/.test(urlMixedId)) {
@@ -195,25 +201,23 @@ function initIVR(config) {
                 selectedDomain = domains[d];
                 (selectedDomain.id + '#').split('').forEach(handleInput);
                 console.log(`Auto-selected domain (from mixedId): ${selectedDomain.name}`);
-                showStatus(messages[lang].chosenDomain(d, selectedDomain.name));
+                showDomainStatus(messages[lang].chosenDomain(d, selectedDomain.name));
             }
         }
     }
-
-    if (urlRoomId && urlRoomId !== '0') pendingRoomId = urlRoomId;
 
     if (urlDomainKey) {
         const found = Object.values(domains).find(d => d.key === urlDomainKey);
         if (found) {
             selectedDomain = found;
             (selectedDomain.id + '#').split('').forEach(handleInput);
-            showStatus(messages[lang].chosenDomain(found.id, found.name));
+            showDomainStatus(messages[lang].chosenDomain(found.id, found.name));
         }
     } else if (urlDomainId && domains[urlDomainId]) {
         selectedDomain = domains[urlDomainId];
         (selectedDomain.id + '#').split('').forEach(handleInput);
         console.log(`Auto-selected domain (by id): ${selectedDomain.name}`);
-        showStatus(messages[lang].chosenDomain(urlDomainId, selectedDomain.name));
+        showDomainStatus(messages[lang].chosenDomain(urlDomainId, selectedDomain.name));
     }
 
     if (!selectedDomain && Object.keys(domains).length === 1) {

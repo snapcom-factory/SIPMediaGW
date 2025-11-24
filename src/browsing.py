@@ -8,11 +8,14 @@ import base64
 import time
 import threading
 import subprocess
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 
 class Browsing:
     def __init__(self, width, height, config,
                  modName=None, room=None, name=None,
-                 driver=None, inputs=None):
+                 service=None, chromeOptions=None,
+                 inputs=None):
         self.url = ''
         self.room = room if room else {}
         self.name = name if name else ''
@@ -23,7 +26,11 @@ class Browsing:
         self.initScript = ''
         self.screenShared = False
         self.userInputs = inputs
-        self.driver = driver
+        self.service = service
+        self.chromeOptions = chromeOptions
+        if os.environ.get('AUDIO_ONLY') == "true":
+            self.chromeOptions.add_argument('--headless=new')
+            self.chromeOptions.add_argument('--use-fake-ui-for-media-stream')
         self.chatMsg = queue.Queue()
 
     def loadJS(self, jsScript):
@@ -43,12 +50,13 @@ class Browsing:
     def join(self):
         self.loadJS(os.path.join(os.path.dirname(os.path.normpath(__file__)),
                                  '../browsing/assets/{}.js'.format(self.modName)))
-        self.initScript = "window.meeting = new window.Browsing('{}', '{}', '{}', '{}', '{}')".format(
+        self.initScript = "window.meeting = new window.Browsing('{}', '{}', '{}', '{}', '{}', '{}')".format(
                                                     self.room['config']['webrtc_domain'],
                                                     self.room['roomName'],
                                                     self.room['displayName'],
                                                     self.room['config']['lang'],
-                                                    self.room['roomToken'])
+                                                    self.room['roomToken'],
+                                                    os.environ.get('AUDIO_ONLY'))
         self.driver.execute_script(self.initScript)
         self.driver.execute_script("window.meeting.join();")
 
@@ -97,6 +105,8 @@ class Browsing:
 
     def run(self):
         try:
+            self.driver = webdriver.Chrome(service=self.service,
+                                           options=self.chromeOptions)
             self.loadPage()
             self.join()
             if os.getenv("ENDING_TIMEOUT"):
