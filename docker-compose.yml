@@ -19,7 +19,7 @@ services:
       - ./browsing:/var/browsing
       - ./src:/var/src
     devices:
-      - /dev/${ID:+video}${ID:-null}:/dev/video0
+      - /dev/${VIDEO_DEV}:/dev/video0
       - /dev/snd:/dev/snd
     shm_size: '2gb'
     logging:
