@@ -58,6 +58,9 @@ body {
 #menu_dtmf {
   bottom: 20px;
   left: 20px;
+  background: white;
+  border-radius: 10px;
+  color: black;
 }
 
 #menu_icon {
@@ -100,7 +103,7 @@ body {
   color: #cccc33;
   font-weight: bold;
   font-size: 1.1em;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0, 0, 0, 0.8);
   padding: 0.5em 0;
   z-index: 100;
 }
