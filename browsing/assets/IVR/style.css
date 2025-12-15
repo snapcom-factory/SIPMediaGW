@@ -58,7 +58,7 @@ body {
 #menu_dtmf {
   bottom: 20px;
   left: 20px;
-  background: white;
+  background-color: white;
   border-radius: 10px;
   color: black;
 }

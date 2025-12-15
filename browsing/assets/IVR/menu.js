@@ -64,6 +64,7 @@ class Menu {
       menu.id = menuId;
       menu.style.position = "fixed";
       menu.style.width = "200px";
+      menu.style.backgroundColor = "white";
       menu.style.bottom = bt;
       menu.style.left = left;
       menu.style.zIndex = "9999";
