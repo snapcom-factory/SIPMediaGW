@@ -8,7 +8,7 @@ class Bigbluebutton {
     }
 
     // Utility: Wait for an element to be clickable
-    async waitForElement(selector, { visible = false, clickable = false } = {}, timeout = 20000) {
+    async waitForElement(selector, { visible = false, clickable = false } = {}, timeout = 200000) {
         const start = Date.now();
 
         return new Promise((resolve, reject) => {
@@ -33,7 +33,7 @@ class Bigbluebutton {
         });
     }
 
-    async tryClickWhileVisible(selector, retries = 5, delay = 1000) {
+    async tryClickWhileVisible(selector, retries = 5, delay = 10000) {
         for (let i = 0; i < retries; i++) {
             try {
                 const el = await this.waitForElement(selector, { clickable: true }, delay);
@@ -58,7 +58,7 @@ class Bigbluebutton {
     async join() {
         try {
             console.log('[INFO] Waiting for display name input...');
-            const nameInput = await this.waitForElement('#joinFormName', { visible: true });
+            const nameInput = await this.waitForElement('#fullname', { visible: true });
             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
             nativeInputValueSetter.call(nameInput, this.displayName);
             nameInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -109,6 +109,8 @@ class Bigbluebutton {
         }
     }
 
+    
+
     interact(key) {
         if (key == "1")
             document.querySelector('[accesskey="M"]').click();
@@ -125,6 +127,8 @@ class Bigbluebutton {
             document.querySelector('[accesskey="R"]').click();
         if (key == "5")
             document.querySelector('[accesskey="U"]').click();
+        if (key == "6")
+            document.querySelector("[aria-label='Accept recording and continue']").click();
         if (key == "s")
             document.querySelector("[data-test='startScreenShare']").click();
     }
