@@ -1,0 +1,14 @@
+[
+  {
+    "service": "jitsi",
+    "label": "Webconf de l'état",
+    "domain": "webconf.numerique.gouv.fr"
+  },
+  {
+    "service": "bigbluebutton",
+    "label": "Webinaire",
+    "domain": "visio-test-1.education.fr/sip-connect"
+  },
+  { "service": "visio", "label": "Visio", "domain": "visio.numerique.gouv.fr" },
+  { "service": "teams", "label": "Teams", "domain": "teams.microsoft.com/meet" }
+]
