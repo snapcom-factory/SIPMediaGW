@@ -1,5 +1,3 @@
-import * as dtmfConfig from "./dtmf.json";
-
 class Menu {
   constructor() {
     this.meeting = window.meeting;
@@ -59,7 +57,7 @@ class Menu {
     }
   }
 
-  createOverlayMenu(imgKey, bt, left, timeout = 0) {
+  async createOverlayMenu(imgKey, bt, left, timeout = 0) {
     var menuId = "menu_" + imgKey;
     let existing = document.getElementById(menuId);
     if (!existing) {
@@ -74,7 +72,9 @@ class Menu {
       menu.style.zIndex = "9999";
       document.body.appendChild(menu);
       const list = document.createElement("ul");
-      dtmfConfig.forEach((text) => {
+      const data = await fetch("./dtmf.json");
+      const serviceData = await data.json();
+      serviceData?.forEach((text) => {
         const li = document.createElement("li");
         li.textContent = text.service;
         list.appendChild(li);
