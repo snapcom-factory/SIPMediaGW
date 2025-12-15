@@ -1,6 +1,9 @@
+import * as dtmfConfig from "./dtmf.json";
+
 class Menu {
   constructor() {
     this.meeting = window.meeting;
+    console.log(this.meeting);
     this.overlayTimeouts = {};
     this.img = { icon: null, dtmf: null };
     const blocker = document.createElement("div");
@@ -65,16 +68,15 @@ class Menu {
       menu.style.position = "fixed";
       menu.style.width = "200px";
       menu.style.backgroundColor = "white";
+      menu.style.borderRadius = "10px";
       menu.style.bottom = bt;
       menu.style.left = left;
       menu.style.zIndex = "9999";
       document.body.appendChild(menu);
-
       const list = document.createElement("ul");
-      const items = ["Item 1", "Item 2", "Item 3"];
-      items.forEach((text) => {
+      dtmfConfig.forEach((text) => {
         const li = document.createElement("li");
-        li.textContent = text;
+        li.textContent = text.service;
         list.appendChild(li);
       });
       menu.appendChild(list);
