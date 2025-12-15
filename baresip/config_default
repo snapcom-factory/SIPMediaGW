@@ -10,8 +10,8 @@
 # SIP
 #sip_listen		0.0.0.0:5060
 #sip_certificate	cert.pem
-sip_cafile		/etc/ssl/certs/ca-certificates.crt
-sip_capath		/etc/ssl/certs
+#sip_cafile		/etc/ssl/certs/ca-certificates.crt
+#sip_capath		/etc/ssl/certs
 #sip_transports		udp,tcp,tls,ws,wss
 #sip_trans_def		udp
 #sip_verify_server	yes
@@ -69,7 +69,7 @@ slidenc_format		yuv420p
 # AVT - Audio/Video Transport
 rtp_tos			184
 rtp_video_tos		136
-#rtp_ports		10000-20000
+rtp_ports		16384-17384
 rtp_bandwidth		1024-2048
 audio_jitter_buffer_type	adaptive		# off, fixed, adaptive
 audio_jitter_buffer_delay	1-100		# (min. frames)-(max. packets)

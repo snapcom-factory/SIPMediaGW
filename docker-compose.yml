@@ -18,6 +18,7 @@ services:
       - ./logs:/var/logs
       - ./browsing:/var/browsing
       - ./src:/var/src
+      - ./baresip:/var/baresip
     devices:
       - /dev/${VIDEO_DEV}:/dev/video0
       - /dev/snd:/dev/snd
