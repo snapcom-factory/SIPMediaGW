@@ -177,8 +177,8 @@ class Browsing:
                 self.interact()
                 self.chatHandler()
 
-    except Exception as e:
-        print("Error while browsing: {}".format(e), flush=True)
+        except Exception as e:
+            print("Error while browsing: {}".format(e), flush=True)
 
     def stop(self):
         try:
