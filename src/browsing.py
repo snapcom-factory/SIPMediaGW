@@ -137,45 +137,45 @@ class Browsing:
     #         print("Error while browsing: {}".format(e), flush=True)
 
     def run(self):
-    try:
-        self.driver = webdriver.Chrome(service=self.service,
-                                       options=self.chromeOptions)
+        try:
+            self.driver = webdriver.Chrome(service=self.service,
+                                        options=self.chromeOptions)
 
-        self.loadPage()
-        self.join()
+            self.loadPage()
+            self.join()
 
-        if os.getenv("ENDING_TIMEOUT"):
-            self.monitorSingleParticipant(int(os.getenv("ENDING_TIMEOUT")), checkInterval=60)
+            if os.getenv("ENDING_TIMEOUT"):
+                self.monitorSingleParticipant(int(os.getenv("ENDING_TIMEOUT")), checkInterval=60)
 
-        # Load images
-        assets_path = os.path.join(
-            os.path.dirname(os.path.normpath(__file__)),
-            '../browsing/assets/'
-        )
+            # Load images
+            assets_path = os.path.join(
+                os.path.dirname(os.path.normpath(__file__)),
+                '../browsing/assets/'
+            )
 
-        self.loadImages(assets_path, self.config['lang'])
+            self.loadImages(assets_path, self.config['lang'])
 
-        # 🔹 Load menu JS
-        self.loadJS(os.path.join(assets_path, 'IVR/menu.js'))
+            # 🔹 Load menu JS
+            self.loadJS(os.path.join(assets_path, 'IVR/menu.js'))
 
-        # 🔹 Load menu JSON config
-        self.loadJSON(
-            os.path.join(assets_path, 'config.json')
-        )
+            # 🔹 Load menu JSON config
+            self.loadJSON(
+                os.path.join(assets_path, 'config.json')
+            )
 
-        # 🔹 Create menu
-        menuScript = """
-            window.menu = new Menu();
-            menu.img['icon'] = '{}';
-            menu.img['dtmf'] = '{}';
-            menu.show();
-        """.format(self.iconB64, self.dtmfB64)
+            # 🔹 Create menu
+            menuScript = """
+                window.menu = new Menu();
+                menu.img['icon'] = '{}';
+                menu.img['dtmf'] = '{}';
+                menu.show();
+            """.format(self.iconB64, self.dtmfB64)
 
-        self.driver.execute_script(menuScript)
+            self.driver.execute_script(menuScript)
 
-        while self.room:
-            self.interact()
-            self.chatHandler()
+            while self.room:
+                self.interact()
+                self.chatHandler()
 
     except Exception as e:
         print("Error while browsing: {}".format(e), flush=True)
