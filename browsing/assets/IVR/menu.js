@@ -14,6 +14,7 @@ class Menu {
     blocker.style.zIndex = "9999";
     document.body.appendChild(blocker);
     this.blocker = blocker;
+    this.config = window.menuConfig || {};
   }
 
   fetchWithTimeout(resource, options = {}, timeout = 5000, onError = null) {
@@ -56,7 +57,7 @@ class Menu {
     }
   }
 
-  async createOverlayMenu(imgKey, bt, left, timeout = 0, config) {
+  async createOverlayMenu(imgKey, bt, left, timeout = 0) {
     var menuId = "menu_" + imgKey;
     let existing = document.getElementById(menuId);
     if (!existing) {
@@ -72,25 +73,25 @@ class Menu {
       document.body.appendChild(menu);
       const list = document.createElement("ul");
 
-      const lang = config["lang"] || "fr";
-      const domains = config["webrtc_domains"];
-      const webrtcDomainsArray = Object.entries(domains).map(
-        ([key, value]) => ({
-          id: key,
-          ...value,
-        })
-      );
-      const service = webrtcDomainsArray.find(
-        (s) => s.domain === this.meeting.domain
-      );
-      console.log(service);
-      if (service) {
-        service.options?.forEach((o) => {
-          const li = document.createElement("li");
-          li.textContent = o[lang];
-          list.appendChild(li);
-        });
-      }
+      // const lang = config["lang"] || "fr";
+      // const domains = config["webrtc_domains"];
+      // const webrtcDomainsArray = Object.entries(domains).map(
+      //   ([key, value]) => ({
+      //     id: key,
+      //     ...value,
+      //   })
+      // );
+      // const service = webrtcDomainsArray.find(
+      //   (s) => s.domain === this.meeting.domain
+      // );
+      // console.log(service);
+      // if (service) {
+      //   service.options?.forEach((o) => {
+      //     const li = document.createElement("li");
+      //     li.textContent = o[lang];
+      //     list.appendChild(li);
+      //   });
+      // }
       menu.appendChild(list);
     } else {
       existing.style.display = "block";
@@ -180,14 +181,8 @@ class Menu {
 
   async show() {
     this.createOverlayImage("icon", "20px", "20px");
-
-    fetch("../config.json")
-      .then((res) => res.json())
-      .then((config) =>
-        this.createOverlayMenu("dtmf", "10px", "10px", 5000, config)
-      )
-      .catch((err) => console.error("Failed to load config.json", err));
-
+    console.log("Menu config loaded:", this.config);
+    this.createOverlayMenu("dtmf", "10px", "10px", 5000);
     this.blocker.focus();
     this.blocker.addEventListener("blur", () => {
       setTimeout(() => this.blocker.focus(), 0);
