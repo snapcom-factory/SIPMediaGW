@@ -64,7 +64,7 @@ class Menu {
       const menu = document.createElement("div");
       menu.id = menuId;
       menu.style.position = "fixed";
-      menu.style.width = "200px";
+      // menu.style.width = "200px";
       menu.style.backgroundColor = "white";
       menu.style.borderRadius = "10px";
       menu.style.bottom = bt;
@@ -101,6 +101,8 @@ class Menu {
       setTimeout(() => this.hideOverlayMenu(menuId), timeout);
     }
   }
+
+  getDtmf() {}
 
   showOverlayMenu(id) {
     const menu = document.getElementById(id);
