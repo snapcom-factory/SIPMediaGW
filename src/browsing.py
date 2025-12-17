@@ -46,6 +46,15 @@ class Browsing:
             self.dtmfB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
         with open(path + "IVR/images/menu-icons/"+ "camera_icon.png", "rb") as f:
             self.cameraIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        with open(path + "IVR/images/menu-icons/"+ "chat_icon.png", "rb") as f:
+            self.chatIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        with open(path + "IVR/images/menu-icons/"+ "hand_icon.png", "rb") as f:
+            self.handIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        with open(path + "IVR/images/menu-icons/"+ "microphone_icon.png", "rb") as f:
+            self.microphoneIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        with open(path + "IVR/images/menu-icons/"+ "participants_icon.png", "rb") as f:
+            self.participantsIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+            
 
     def loadPage(self):
         pass
