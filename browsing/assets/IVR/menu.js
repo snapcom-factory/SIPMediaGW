@@ -73,25 +73,26 @@ class Menu {
       document.body.appendChild(menu);
       const list = document.createElement("ul");
 
-      // const lang = config["lang"] || "fr";
-      // const domains = config["webrtc_domains"];
-      // const webrtcDomainsArray = Object.entries(domains).map(
-      //   ([key, value]) => ({
-      //     id: key,
-      //     ...value,
-      //   })
-      // );
-      // const service = webrtcDomainsArray.find(
-      //   (s) => s.domain === this.meeting.domain
-      // );
-      // console.log(service);
-      // if (service) {
-      //   service.options?.forEach((o) => {
-      //     const li = document.createElement("li");
-      //     li.textContent = o[lang];
-      //     list.appendChild(li);
-      //   });
-      // }
+      console.log(this.config);
+      const lang = this.config.lang || "fr";
+      const domains = this.config.webrtc_domains;
+      const webrtcDomainsArray = Object.entries(domains).map(
+        ([key, value]) => ({
+          id: key,
+          ...value,
+        })
+      );
+      const service = webrtcDomainsArray.find(
+        (s) => s.domain === this.meeting.domain
+      );
+
+      if (service) {
+        service.options?.forEach((o) => {
+          const li = document.createElement("li");
+          li.textContent = o[lang];
+          list.appendChild(li);
+        });
+      }
       menu.appendChild(list);
     } else {
       existing.style.display = "block";
