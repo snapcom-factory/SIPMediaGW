@@ -170,7 +170,7 @@ class Browsing:
                 menu.img['dtmf'] = '{}';
                 menu.img = window.menuImages || {};
                 menu.show();
-            """.format(self.iconB64, self.dtmfB64, self.cameraIconB64, self.handIconB64, self.chatIconB64, self.participantsIconB64, self.microphoneIconB64)
+            """
 
             self.driver.execute_script(menuScript)
 
