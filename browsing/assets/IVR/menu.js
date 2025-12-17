@@ -64,36 +64,14 @@ class Menu {
       const menu = document.createElement("div");
       menu.id = menuId;
       menu.style.position = "fixed";
-      // menu.style.width = "200px";
       menu.style.backgroundColor = "white";
       menu.style.borderRadius = "10px";
       menu.style.bottom = bt;
       menu.style.left = left;
       menu.style.zIndex = "9999";
+      menu.style.padding = "10px";
       document.body.appendChild(menu);
-      const list = document.createElement("ul");
-
-      console.log(this.config);
-      const lang = this.config.lang || "fr";
-      const domains = this.config.webrtc_domains;
-      const webrtcDomainsArray = Object.entries(domains).map(
-        ([key, value]) => ({
-          id: key,
-          ...value,
-        })
-      );
-      const service = webrtcDomainsArray.find(
-        (s) => s.domain === this.meeting.domain
-      );
-
-      if (service) {
-        service.options?.forEach((o) => {
-          const li = document.createElement("li");
-          li.textContent = o[lang];
-          list.appendChild(li);
-        });
-      }
-      menu.appendChild(list);
+      menu.appendChild(this.createMenuContainer());
     } else {
       existing.style.display = "block";
     }
@@ -102,7 +80,81 @@ class Menu {
     }
   }
 
-  getDtmf() {}
+  createMenuContainer() {
+    const container = document.createElement("div");
+    Object.assign(container.style, {
+      backgroundColor: "white",
+      borderRadius: "10px",
+      color: "black",
+      padding: "15px",
+    });
+
+    const column = document.createElement("div");
+    Object.assign(column.style, {
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+    });
+
+    const dtmfOptions = this.getDtmfOptions();
+    dtmfOptions?.forEach((option) => {
+      column.appendChild(this.createFlexLine(option));
+    });
+
+    container.appendChild(column);
+    return container;
+  }
+
+  createFlexLine(option) {
+    const lang = this.config.lang || "fr";
+    const line = document.createElement("div");
+    Object.assign(line.style, {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: "20px",
+    });
+
+    const img = document.createElement("img");
+    img.src = `images/icons/${option.icon}_icon.png`;
+    img.style.width = "25px";
+
+    const label = document.createElement("span");
+    label.textContent = option[lang];
+    label.style.flexGrow = "1";
+
+    const badge = document.createElement("span");
+    badge.textContent = option.dtmf;
+    Object.assign(badge.style, {
+      backgroundColor: "#000091",
+      color: "white",
+      width: "20px",
+      height: "20px",
+      borderRadius: "50%",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      fontSize: "12px",
+    });
+
+    line.appendChild(img);
+    line.appendChild(label);
+    line.appendChild(badge);
+
+    return line;
+  }
+
+  getDtmfOptions() {
+    const domains = this.config.webrtc_domains;
+    const webrtcDomainsArray = Object.entries(domains).map(([key, value]) => ({
+      id: key,
+      ...value,
+    }));
+    const service = webrtcDomainsArray.find(
+      (s) => s.domain === this.meeting.domain
+    );
+    return service ? service.options : null;
+  }
 
   showOverlayMenu(id) {
     const menu = document.getElementById(id);
@@ -173,14 +225,6 @@ class Menu {
       }, timeout);
     }
   }
-
-  // interact(key) {
-  //   if (key == "#") {
-  //     this.toggleOverlayImage("menu_dtmf", 5000);
-  //   } else {
-  //     this.meeting.interact(key);
-  //   }
-  // }
 
   async show() {
     this.createOverlayImage("icon", "20px", "20px");
