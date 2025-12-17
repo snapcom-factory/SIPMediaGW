@@ -158,7 +158,7 @@ class Browsing:
                 menu.img['participants_icon'] = '{}';
                 menu.img['microphone_icon'] = '{}';
                 menu.show();
-            """.format(self.iconB64, self.dtmfB64, self.cameraIconB64)
+            """.format(self.iconB64, self.dtmfB64, self.cameraIconB64, self.handIconB64, self.chatIconB64, self.participantsIconB64, self.microphoneIconB64)
 
             self.driver.execute_script(menuScript)
 
