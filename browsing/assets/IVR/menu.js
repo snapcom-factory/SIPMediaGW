@@ -2,7 +2,11 @@ class Menu {
   constructor() {
     this.meeting = window.meeting;
     this.overlayTimeouts = {};
-    this.img = { icon: null, dtmf: null };
+    this.img = {
+      icon: null,
+      dtmf: null,
+      icons: {},
+    };
     const blocker = document.createElement("div");
     blocker.id = "blocker";
     blocker.tabIndex = 0;
@@ -119,7 +123,7 @@ class Menu {
     });
 
     const img = document.createElement("img");
-    img.src = this.img[option.icon + "_icon"];
+    img.src = this.img.icons[option.icon + "_icon"];
     img.style.width = "25px";
 
     const label = document.createElement("span");
