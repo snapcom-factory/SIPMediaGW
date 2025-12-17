@@ -156,7 +156,7 @@ class Browsing:
                 '../browsing/assets/'
             )
 
-            self.loadImages(assets_path)
+            self.loadImages(assets_path, self.config['lang'])
 
             self.loadJS(os.path.join(assets_path, 'IVR/menu.js'))
 
