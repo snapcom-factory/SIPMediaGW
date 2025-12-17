@@ -39,22 +39,38 @@ class Browsing:
             js_code = f.read()
         self.driver.execute_script(js_code)
 
-    def loadImages(self, path, lang):
+    def loadImages(self, path):
         with open(path + "icon.png", "rb") as f:
             self.iconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open( path + "dtmf_{}.png".format(lang), "rb") as f:
-            self.dtmfB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open(path + "IVR/images/menu-icons/"+ "camera_icon.png", "rb") as f:
-            self.cameraIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open(path + "IVR/images/menu-icons/"+ "chat_icon.png", "rb") as f:
-            self.chatIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open(path + "IVR/images/menu-icons/"+ "hand_icon.png", "rb") as f:
-            self.handIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open(path + "IVR/images/menu-icons/"+ "microphone_icon.png", "rb") as f:
-            self.microphoneIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open(path + "IVR/images/menu-icons/"+ "participants_icon.png", "rb") as f:
-            self.participantsIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-            
+
+        # with open(path + "IVR/images/menu-icons/"+ "camera_icon.png", "rb") as f:
+        #     self.cameraIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        # with open(path + "IVR/images/menu-icons/"+ "chat_icon.png", "rb") as f:
+        #     self.chatIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        # with open(path + "IVR/images/menu-icons/"+ "hand_icon.png", "rb") as f:
+        #     self.handIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        # with open(path + "IVR/images/menu-icons/"+ "microphone_icon.png", "rb") as f:
+        #     self.microphoneIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        # with open(path + "IVR/images/menu-icons/"+ "participants_icon.png", "rb") as f:
+        #     self.participantsIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        icons_path = os.path.join(base_path, "IVR/images/menu-icons")
+
+        images = {}
+
+        for filename in os.listdir(icons_path):
+            if not filename.lower().endswith(".png"):
+                continue
+
+            key = os.path.splitext(filename)[0] 
+            file_path = os.path.join(icons_path, filename)
+
+            with open(file_path, "rb") as f:
+                images[key] = (
+                    "data:image/png;base64,"
+                    + base64.b64encode(f.read()).decode("utf-8")
+                )
+
+        self.menuImages = images
 
     def loadPage(self):
         pass
@@ -140,7 +156,7 @@ class Browsing:
                 '../browsing/assets/'
             )
 
-            self.loadImages(assets_path, self.config['lang'])
+            self.loadImages(assets_path)
 
             self.loadJS(os.path.join(assets_path, 'IVR/menu.js'))
 
@@ -152,11 +168,7 @@ class Browsing:
                 window.menu = new Menu();
                 menu.img['icon'] = '{}';
                 menu.img['dtmf'] = '{}';
-                menu.img['camera_icon'] = '{}';
-                menu.img['hand_icon'] = '{}';
-                menu.img['chat_icon'] = '{}';
-                menu.img['participants_icon'] = '{}';
-                menu.img['microphone_icon'] = '{}';
+                menu.img = window.menuImages || {};
                 menu.show();
             """.format(self.iconB64, self.dtmfB64, self.cameraIconB64, self.handIconB64, self.chatIconB64, self.participantsIconB64, self.microphoneIconB64)
 
