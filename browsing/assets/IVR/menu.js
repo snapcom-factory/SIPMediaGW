@@ -85,8 +85,11 @@ class Menu {
     Object.assign(container.style, {
       backgroundColor: "white",
       borderRadius: "10px",
+      border: "1px solid black",
       color: "black",
       padding: "15px",
+      boxShadow:
+        "0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1)",
     });
 
     const column = document.createElement("div");
