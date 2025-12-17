@@ -153,6 +153,10 @@ class Browsing:
                 menu.img['icon'] = '{}';
                 menu.img['dtmf'] = '{}';
                 menu.img['camera_icon'] = '{}';
+                menu.img['hand_icon'] = '{}';
+                menu.img['chat_icon'] = '{}';
+                menu.img['participants_icon'] = '{}';
+                menu.img['microphone_icon'] = '{}';
                 menu.show();
             """.format(self.iconB64, self.dtmfB64, self.cameraIconB64)
 
