@@ -72,6 +72,11 @@ class Browsing:
 
         self.menuImages = images
 
+          self.driver.execute_script(
+            "window.menuImages = arguments[0];",
+            images
+        )
+
     def loadPage(self):
         pass
 
