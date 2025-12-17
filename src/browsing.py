@@ -44,6 +44,8 @@ class Browsing:
             self.iconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
         with open( path + "dtmf_{}.png".format(lang), "rb") as f:
             self.dtmfB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
+        with open(path + "menu-icons/"+ "camera_icon.png", "rb") as f:
+            self.cameraIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
 
     def loadPage(self):
         pass
@@ -108,33 +110,10 @@ class Browsing:
         with open(jsonPath, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Inject as a real JS object (NOT a string)
         self.driver.execute_script(
             f"window.{varName} = arguments[0];",
             data
         )
-
-    # def run(self):
-    #     try:
-    #         self.driver = webdriver.Chrome(service=self.service,
-    #                                        options=self.chromeOptions)
-    #         self.loadPage()
-    #         self.join()
-    #         if os.getenv("ENDING_TIMEOUT"):
-    #             self.monitorSingleParticipant(int(os.getenv("ENDING_TIMEOUT")), checkInterval=60)
-    #         self.loadImages(os.path.join(os.path.dirname(os.path.normpath(__file__)),'../browsing/assets/'),
-    #                         self.config['lang'])
-    #         menuScript = "menu=new Menu(); \
-    #                     menu.img['icon'] = '{}'; \
-    #                     menu.img['dtmf'] = '{}'; \
-    #                     menu.show();".format(self.iconB64, self.dtmfB64)
-    #         self.loadJS(os.path.join(os.path.dirname(os.path.normpath(__file__)),'../browsing/assets/IVR/menu.js'))
-    #         self.driver.execute_script(menuScript)
-    #         while self.room:
-    #             self.interact()
-    #             self.chatHandler()
-    #     except Exception as e:
-    #         print("Error while browsing: {}".format(e), flush=True)
 
     def run(self):
         try:
@@ -147,7 +126,6 @@ class Browsing:
             if os.getenv("ENDING_TIMEOUT"):
                 self.monitorSingleParticipant(int(os.getenv("ENDING_TIMEOUT")), checkInterval=60)
 
-            # Load images
             assets_path = os.path.join(
                 os.path.dirname(os.path.normpath(__file__)),
                 '../browsing/assets/'
@@ -155,21 +133,19 @@ class Browsing:
 
             self.loadImages(assets_path, self.config['lang'])
 
-            # 🔹 Load menu JS
             self.loadJS(os.path.join(assets_path, 'IVR/menu.js'))
 
-            # 🔹 Load menu JSON config
             self.loadJSON(
                 os.path.join(assets_path, 'config.json')
             )
 
-            # 🔹 Create menu
             menuScript = """
                 window.menu = new Menu();
                 menu.img['icon'] = '{}';
                 menu.img['dtmf'] = '{}';
+                menu.img['camera_icon'] = '{}';
                 menu.show();
-            """.format(self.iconB64, self.dtmfB64)
+            """.format(self.iconB64, self.dtmfB64, self.cameraIconB64)
 
             self.driver.execute_script(menuScript)
 
