@@ -53,7 +53,7 @@ class Browsing:
         #     self.microphoneIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
         # with open(path + "IVR/images/menu-icons/"+ "participants_icon.png", "rb") as f:
         #     self.participantsIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        icons_path = os.path.join(base_path, "IVR/images/menu-icons")
+        icons_path = os.path.join(path, "IVR/images/menu-icons")
 
         images = {}
 
