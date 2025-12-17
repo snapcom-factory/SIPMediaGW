@@ -123,7 +123,7 @@ class Menu {
     });
 
     const img = document.createElement("img");
-    img.src = this.img.icons[option.icon + "_icon"];
+    img.src = this.img.icons[option.icon];
     img.style.width = "25px";
 
     const label = document.createElement("span");
