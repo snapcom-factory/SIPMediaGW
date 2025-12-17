@@ -44,7 +44,7 @@ class Browsing:
             self.iconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
         with open( path + "dtmf_{}.png".format(lang), "rb") as f:
             self.dtmfB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
-        with open(path + "menu-icons/"+ "camera_icon.png", "rb") as f:
+        with open(path + "images/menu-icons/"+ "camera_icon.png", "rb") as f:
             self.cameraIconB64 = "data:image/png;base64,{}".format(base64.b64encode(f.read()).decode("utf-8"))
 
     def loadPage(self):
