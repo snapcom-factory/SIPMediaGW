@@ -116,7 +116,7 @@ class Menu {
     });
 
     const img = document.createElement("img");
-    img.src = `images/icons/${option.icon}_icon.png`;
+    img.src = this.img["camera_icon"];
     img.style.width = "25px";
 
     const label = document.createElement("span");
@@ -128,6 +128,7 @@ class Menu {
     Object.assign(badge.style, {
       backgroundColor: "#000091",
       color: "white",
+      fontWeight: "bold",
       width: "20px",
       height: "20px",
       borderRadius: "50%",
