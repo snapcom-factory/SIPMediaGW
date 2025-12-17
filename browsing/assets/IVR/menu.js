@@ -116,7 +116,7 @@ class Menu {
     });
 
     const img = document.createElement("img");
-    img.src = this.img["camera_icon"];
+    img.src = this.img[option.icon + "_icon"];
     img.style.width = "25px";
 
     const label = document.createElement("span");
@@ -135,7 +135,6 @@ class Menu {
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      fontSize: "12px",
     });
 
     line.appendChild(img);
