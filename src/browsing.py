@@ -72,7 +72,7 @@ class Browsing:
 
         self.menuImages = images
 
-          self.driver.execute_script(
+        self.driver.execute_script(
             "window.menuImages = arguments[0];",
             images
         )
