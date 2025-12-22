@@ -8,7 +8,7 @@ class Bigbluebutton {
     }
 
     // Utility: Wait for an element to be clickable
-    async waitForElement(selector, { visible = false, clickable = false } = {}, timeout = 200000) {
+    async waitForElement(selector, { visible = false, clickable = false } = {}, timeout = 2000) {
         const start = Date.now();
 
         return new Promise((resolve, reject) => {
@@ -33,7 +33,7 @@ class Bigbluebutton {
         });
     }
 
-    async tryClickWhileVisible(selector, retries = 5, delay = 10000) {
+    async tryClickWhileVisible(selector, retries = 5, delay = 1000) {
         for (let i = 0; i < retries; i++) {
             try {
                 const el = await this.waitForElement(selector, { clickable: true }, delay);

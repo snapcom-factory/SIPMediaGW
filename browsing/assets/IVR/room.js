@@ -40,12 +40,12 @@ export class Room {
         const timeout = 5000;
         const authURL = this.config['auth_token']['url'];
         try {
-            if (mapperURL && /^\d+$/.test(String(this.roomId))) {
+            if (mapperURL && /^\d{10}$/.test(String(this.roomId))) {
                 await this.getConferenceName(mapperURL, timeout, onError);
             }
-            if(!this.mailOwner) {
-                this.roomToken = '';
-            }
+            // if(!this.mailOwner) {
+            //     this.roomToken = '';
+            // }
             if (authURL) {
                 await this.getConferenceToken(authURL, timeout, onError);
             }
