@@ -56,6 +56,7 @@ class Jitsi {
         document.body.style.width = '100vw';
         document.body.style.overflow = 'hidden';
         this.participantsPaneVisible = false;
+        this.toggleLobby = false;
         this.jitsiApiClient = null;
     }
     join() {
@@ -97,7 +98,8 @@ class Jitsi {
         if (key == "6")
             this.jitsiApiClient.executeCommand('toggleTileView');
         if (key == "7")
-            this.jitsiApiClient.executeCommand('toggleLobby');
+            this.toggleLobby = !this.toggleLobby;
+            this.jitsiApiClient.executeCommand('toggleLobby', this.toggleLobby);
         if (key == "8")
             this.jitsiApiClient.executeCommand('muteEveryone');
         if (key == "s")
