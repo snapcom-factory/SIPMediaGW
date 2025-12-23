@@ -11,6 +11,14 @@ from selenium.webdriver.support import expected_conditions as EC
 
 class BigBlueButton (Browsing):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Retirer l’option gênante
+        if '--disable-web-security' in self.chromeOptions.arguments:
+            self.chromeOptions.arguments.remove('--disable-web-security')
+            print(">>> Removed '--disable-web-security' from Chrome options", flush=True)
+
     def loadPage(self):
         self.token=""
         self.driver.execute_cdp_cmd("Network.enable", {})
