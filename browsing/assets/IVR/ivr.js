@@ -90,6 +90,7 @@ function initIVR(config) {
   const poweredbyEl = document.getElementById("powerdBy");
   const headerlogoEl = document.getElementById("header-logo");
   const mainEl = document.getElementById("main");
+  const loadingEl = document.getElementById("loading");
   const lang = config["lang"] || "fr";
   const expectedLength = parseInt(config["min_ivr_digit_length"], 10) || 0;
   const domains = parseDomains(config["webrtc_domains"]);
@@ -163,7 +164,7 @@ function initIVR(config) {
                 <img alt="${d.name}" src="images/${d.key}.png"/>
                 <div class="domain-name">${d.name}</div>
               </div>
-            </div>`
+            </div>`,
         )
         .join("");
       showTitle();
@@ -179,7 +180,7 @@ function initIVR(config) {
   function handleIncomplete(inputDigits) {
     const msg = messages[lang].expectedLength(
       inputDigits.length,
-      expectedLength
+      expectedLength,
     );
     const isLengthOk = inputDigits.length >= expectedLength;
     digitsLengthMessageEl.innerHTML = `<span class="${
@@ -208,8 +209,8 @@ function initIVR(config) {
             messages[lang].chosenDomain(
               domainId,
               selectedDomain.name,
-              selectedDomain.key
-            )
+              selectedDomain.key,
+            ),
           );
           window.browsing = selectedDomain.key;
           inputDigits = [];
@@ -226,6 +227,7 @@ function initIVR(config) {
           showStatus(messages[lang].invalid(inputDigits.join("")), "red");
         }
       } else if (stage === "room") {
+        loadingEl.style.display = "block";
         const roomId = inputDigits.join("");
         if (expectedLength === 0 || inputDigits.length >= expectedLength) {
           const room = new Room({
@@ -254,12 +256,12 @@ function initIVR(config) {
               showStatus(messages[lang].invalid(errorReason.error), "red");
               digitsEl.style.visibility = "visible";
               showPrompt();
-            }
+            },
           );
         } else {
           showStatus(
             messages[lang].incomplete(inputDigits.length, expectedLength),
-            "red"
+            "red",
           );
           digitsEl.style.visibility = "visible";
           showPrompt();
@@ -305,7 +307,7 @@ function initIVR(config) {
         selectedDomain = domains[d];
         (selectedDomain.id + "#").split("").forEach(handleInput);
         console.log(
-          `Auto-selected domain (from mixedId): ${selectedDomain.name}`
+          `Auto-selected domain (from mixedId): ${selectedDomain.name}`,
         );
         showDomainStatus(messages[lang].chosenDomain(d, selectedDomain.name));
       }
@@ -343,8 +345,8 @@ function initIVR(config) {
       messages[lang].chosenDomain(
         urlDomainId,
         selectedDomain.name,
-        selectedDomain.key
-      )
+        selectedDomain.key,
+      ),
     );
   }
 
