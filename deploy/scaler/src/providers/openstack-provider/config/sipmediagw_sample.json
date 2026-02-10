@@ -1,0 +1,30 @@
+{
+    "profile": {
+        "visio-dev": {
+            "cloud": null,
+            "region_name": "UK1",
+            "auth": {
+                "auth_url": "https://auth.cloud.ovh.net/",
+                "auth_type": "v3applicationcredential",
+                "application_credential_id": "02ca8d04193444dcba63798d187ac57b",
+                "application_credential_secret": "GJIRuafLm_r2xRIbKcDBwQUUgE1h_jhlvkyC1eB5kQyeD-6JBEIBpkzFlJUbWAOvSmWkYB6VAnQifJ7M1rSlYA",
+                "project_name": null,
+                "user_domain_name": "Default",
+                "project_domain_name": "default"
+            }
+        }
+    },
+    "security_group": {
+        "admin": null,
+        "app": null
+    },
+    "instance_image": "sipmediagw-visio",
+    "instance_type_by_cpu_num": {
+        "2": "d2-4",
+        "4": "d2-8"
+    },
+    "name": null,
+    "network": "internal",
+    "floating_ip_network": null,
+    "keypair": "nca"
+}
