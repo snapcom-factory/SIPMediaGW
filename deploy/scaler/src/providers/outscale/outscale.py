@@ -4,7 +4,7 @@ import json
 import importlib
 import base64
 from ipaddress import ip_address
-from deploy.scaler.src.manageInstance import ManageInstance
+from manageInstance import ManageInstance
 
 class Outscale(ManageInstance):
 
@@ -35,34 +35,36 @@ class Outscale(ManageInstance):
         self.userData = ""
 
         # User Data
-        sipDomain = None
-        if 'sip_domain' in instConfig['user_data']:
-            if instConfig['user_data']['sip_domain']['priv']:
-                sipDomain = instConfig['user_data']['sip_domain']['priv']
-            else:
-                sipDomain = instConfig['user_data']['sip_domain']['pub']
-                pubIp = instConfig['user_data']['sip_domain']['pub']
+        self.userData += "\n".join(instConfig['user_data']['script']['common'])
 
-        outboundProxy = None
-        if 'outbound_proxy' in instConfig['user_data']:
-            if instConfig['user_data']['outbound_proxy']['priv']:
-                outboundProxy = instConfig['user_data']['outbound_proxy']['priv']
-            else:
-                outboundProxy = instConfig['user_data']['outbound_proxy']['pub']
+        if "sip" in initData:
+            sipRegistrar = None
+            if 'sip_registrar' in instConfig['user_data']:
+                if instConfig['user_data']['sip_registrar']['priv']:
+                    sipRegistrar = instConfig['user_data']['sip_registrar']['priv']
+                else:
+                    sipRegistrar = instConfig['user_data']['sip_registrar']['pub']
+            if not "registrar" in initData["sip"]:
+                initData["sip"]["registrar"] = sipRegistrar
 
-        turnSrv = None
-        if 'turn_server' in instConfig['user_data']:
-            pubIp = instConfig['user_data']['turn_server']['pub']
-            if instConfig['user_data']['turn_server']['priv']:
-                turnSrv = instConfig['user_data']['turn_server']['priv']
-            else:
-                turnSrv = instConfig['user_data']['turn_server']['pub']
-        dockerImg = instConfig['user_data']['docker_image']
-        self.userData = "\n".join(instConfig['user_data']['script']['common']).format(docker=dockerImg,
-                                                                                      sip=sipDomain,
-                                                                                      outbound=outboundProxy,
-                                                                                      turn=turnSrv,
-                                                                                      pub=pubIp)
+            outboundProxy = None
+            if 'outbound_proxy' in instConfig['user_data']:
+                if instConfig['user_data']['outbound_proxy']['priv']:
+                    outboundProxy = instConfig['user_data']['outbound_proxy']['priv']
+                else:
+                    outboundProxy = instConfig['user_data']['outbound_proxy']['pub']
+            if not "proxy" in initData["sip"]:
+                initData["sip"]["proxy"] = outboundProxy
+
+            turnSrv = None
+            if 'turn_server' in instConfig['user_data']:
+                if instConfig['user_data']['turn_server']['priv']:
+                    turnSrv = instConfig['user_data']['turn_server']['priv']
+                else:
+                    turnSrv = instConfig['user_data']['turn_server']['pub']
+            if not "turn" in initData["sip"]:
+                initData["sip"]["turn"] = turnSrv
+
         for act in initData:
             self.userData += "\n"
             self.userData += "\n".join(instConfig['user_data']['script'][act]).format(**initData[act])
@@ -96,8 +98,8 @@ class Outscale(ManageInstance):
                              'cpu_count':int(cpuCnt)})
         return instDict
 
-    def runInstance(self, numCPU):
-            bdm = [{ "Ebs": {"DeleteOnTemination": True, "VolumeSize": 20, "VolumeType": "gp2"},
+    def runInstance(self, numCPU, gigaRAM):
+            bdm = [{ "Ebs": {"DeleteOnTemination": True, "VolumeSize": 10, "VolumeType": "standard"},
                     "DeviceName": "/dev/sda1" }]
             self.fcu.make_request("RunInstances", 
                             Profile=self.profile, Version=self.version,
@@ -107,14 +109,14 @@ class Outscale(ManageInstance):
                             ImageId=self.ami,
                             KeyName="Visio-DEV",
                             InstanceInitiatedShutdownBehavior="stop",
-                            InstanceType=self.instType[numCPU],
+                            InstanceType= self.instType[numCPU][gigaRAM],
                             SubnetId=self.subNet,
                             SecurityGroupId=[self.secuGrp['admin'],self.secuGrp['app']],
                             UserData=base64.b64encode(self.userData.encode('ascii')).decode("utf-8"))
             return self.fcu.response['RunInstancesResponse']['instancesSet']['item']
 
-    def createInstance(self, numCPU, name=None, ip=None):
-        res = self.runInstance(numCPU)
+    def createInstance(self, numCPU, gigaRAM, name=None, ip=None):
+        res = self.runInstance(numCPU, gigaRAM)
         if 'instanceId' in res:
             instanceId = res['instanceId']
             instName = res['privateDnsName']
@@ -131,7 +133,7 @@ class Outscale(ManageInstance):
         res = self.fcu.make_request("CreateTags", Profile=self.profile, Version=self.version,
                             ResourceId=instanceId,
                             Tag=[{"Key": "name", "Value":"{}".format(instName)}])
-        print('Created Instance: {}, {}, {}, {}VCPUs'.format(instanceId, privIp, pubIp, numCPU), flush=True)
+        print('Created Instance: {}, {}, {}, {}VCPUs, {}G'.format(instanceId, privIp, pubIp, numCPU, gigaRAM), flush=True)
 
         return { "id":instanceId, "ip":pubIp}
 

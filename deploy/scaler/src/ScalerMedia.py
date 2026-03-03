@@ -6,7 +6,7 @@ import json
 import redis
 
 from contextlib import closing
-from deploy.scaler.src.Scaler import Scaler
+from Scaler import Scaler
 
 def getSeconds(stringHMS):
    timedeltaObj = dt.datetime.strptime(stringHMS, "%H:%M:%S") - dt.datetime(1900,1,1)
@@ -69,19 +69,7 @@ class ScalerMedia(Scaler):
             print(f"Cleaning up stale gateways: {ipList}", flush=True)
             self.csp.destroyInstances(ipList)
         
-        #Get running VM instances
-        instList = self.csp.enumerateInstances()
-        runningCpuCount = 0
-        if instList:
-            for inst in instList:
-                runningCpuCount+= inst['cpu_count']
-                if not inst['addr']['pub']:
-                    now = dt.datetime.now(dt.timezone.utc)
-                    start = du.parse(inst['start'])
-                    if (now-start).total_seconds() > 600:
-                        self.csp.destroyInstances([inst['addr']['priv']])
-                        self.redisClient.delete(f"gateway:{inst['addr']['priv']}")
-            print('Number of running CPUs: {} \n'.format(runningCpuCount), flush=True)
+        super().cleanup()
 
     # Get current available capacity
     def getCurrentCapacity(self):

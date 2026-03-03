@@ -27,9 +27,9 @@ class Scaler:
             instNum = numCPU//int(cpu)
             numCPU = numCPU%int(cpu)
             for i in range(instNum):
-                self.csp.createInstance(cpu, self.config['gw_name_prefix'])
+                self.csp.createInstance(cpu, '{}'.format(self.config['ram_per_gw']), self.config['gw_name_prefix'])
         if numCPU != 0:
-            self.csp.createInstance(cpu, self.config['gw_name_prefix'])
+            self.csp.createInstance(cpu, '{}'.format(self.config['ram_per_gw']), self.config['gw_name_prefix'])
 
     # Downscale function
     def downScale(self, numGW):
@@ -37,7 +37,19 @@ class Scaler:
 
     # Cleanup stale instances
     def cleanup(self):
-     pass
+        instList = self.csp.enumerateInstances()
+        runningCpuCount = 0
+        if instList :
+            for inst in instList:
+                if inst in self.config['cleaner_blacklist']:
+                    continue
+                runningCpuCount+= inst['cpu_count']
+                if not inst['addr']['pub']:
+                    now = dt.datetime.now(dt.timezone.utc)
+                    start = du.parse(inst['start'])
+                    if (now-start).total_seconds() > 600:
+                        self.csp.destroyInstances([inst['addr']['priv']])
+        print('Number of running CPUs: {} \n'.format(runningCpuCount), flush=True)
 
     # Get current available capacity
     def getCurrentCapacity(self):
@@ -63,11 +75,16 @@ class Scaler:
         inCallNum = incallsNum if incallsNum else (currentCapacity - readyToRunNum )
         minCapacity = thresholdTimeLine[th]['unlockedMin'] + inCallNum
         if readyToRunNum < thresholdTimeLine[th]['unlockedMin']:
-            self.upScale(math.ceil(self.config['cpu_per_gw']*
-                                        (thresholdTimeLine[th]['unlockedMin'] - readyToRunNum)))
-            currentCapacity = thresholdTimeLine[th]['unlockedMin'] + inCallNum
+            targetCapacity = min((currentCapacity + thresholdTimeLine[th]['unlockedMin']
+                                  - readyToRunNum),
+                                  thresholdTimeLine[th]['maxGw'])
+            capacityIncrease = math.ceil(targetCapacity - currentCapacity)
+            if capacityIncrease > 0:
+                self.upScale(math.ceil(capacityIncrease*self.config['cpu_per_gw']))
+                currentCapacity = currentCapacity + capacityIncrease
 
-        targetCapacity = max(minCapacity, inCallNum/thresholdTimeLine[th]['loadMax'])
+        targetCapacity = min(thresholdTimeLine[th]['maxGw'],
+                             max(minCapacity, inCallNum/thresholdTimeLine[th]['loadMax']))
         capacityIncrease = math.ceil(targetCapacity - currentCapacity)
 
         if capacityIncrease > 0:
