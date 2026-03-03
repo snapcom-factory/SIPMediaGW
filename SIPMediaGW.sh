@@ -8,6 +8,7 @@ init=''
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -a|--main-app) main_app="$2"; shift 2;;
+        -b|--browsing-name) browsing_name="$2"; shift 2;;
         -d|--dial-uri) dial_uri="$2"; shift 2;;
         -g|--gw-name) gw_name="$2"; shift 2;;
         -p|--prefix) prefix="$2"; shift 2;;
@@ -16,11 +17,12 @@ while [[ $# -gt 0 ]]; do
         -u|--rtmp-dst) rtmp_dst="$2"; shift 2;;
         -k|--api-key) api_key="$2"; shift 2;;
         -m|--recipient-mail) recipient_mail="$2"; shift 2;;
+        -n|--user-name) user_name="$2"; shift 2;;
         -o|--audio-only) audio_only="true"; shift 2;;
         -s|--with-transcript) with_transcript="true"; shift;;
-        -w|--webrtc-domain) webrtc_domain="$2"; shift 2;;
         -l|--loop) loop=1; shift;;
         -i|--init) init=1; shift;;
+        -x|--display) display="$2"; shift 2;;
         *)
             echo 'Error in command line parsing' >&2
             exit 1
@@ -34,6 +36,12 @@ MAIN_APP=${main_app:-$MAIN_APP}
 FS_API_KEY=${api_key:-$FS_API_KEY}
 
 CPU_PER_GW=$(docker compose config 2>/dev/null | awk '/CPU_PER_GW:/ {print $2}')
+
+if [[ -n "$display" ]]; then
+    DISPLAY=:$display xhost +local:docker
+    pulse_server=unix:/tmp/pulse/native
+    with_alsa="false"
+fi
 
 lockFilePrefix="sipmediagw"
 
@@ -84,7 +92,7 @@ if [[ -z "$id" ]]; then
     if [ -e "/tmp/${lockFilePrefix}$(($maxGwNum - 1)).lock" ]; then
         echo "{'res':'error','type':'All gateways were started : $maxGwNum'}"
         exit 1
-    else 
+    else
         echo "{'res':'error','type':'No resources available to start the gateway'}"
         exit 1
     fi
@@ -102,15 +110,23 @@ if [[ "$MAIN_APP" == "baresip" ]]; then
     if [ "$audio_only" != "true" ]; then
         video_dev="video$id"
     fi
-    docker container prune --force > /dev/null
+fi
+if [[ -n "$display" ]]; then
+    video_dev="video$id"
 fi
 
+if [[ -n "$init" || ( "$MAIN_APP" == "baresip" ) ]]; then
+    docker container rm gw$id --force > /dev/null
+fi
 
 SERVICES="gw"
 COMPOSE_FILE="-f docker-compose.yml"
 if [[ "$with_transcript" ]]; then
 	COMPOSE_FILE="$COMPOSE_FILE -f transcript/docker-compose.yml"
 	SERVICES="$SERVICES transcript"
+fi
+if [[ "$display" ]]; then
+	COMPOSE_FILE="$COMPOSE_FILE -f x11/docker-compose.yml"
 fi
 
 if [[ -z "$gw_name" ]]; then
@@ -128,7 +144,7 @@ HOST_TZ=$(cat /etc/timezone) \
 HOST_IP=${HOST_IP:-$(hostname -I | awk '{print $1}')} \
 ROOM=$room \
 GW_NAME=$GW_NAME \
-DOMAIN=$webrtc_domain \
+BROWSING=$browsing_name \
 RTMP_DST=$rtmp_dst \
 FS_API_KEY=$FS_API_KEY \
 FS_RECIPIENT_MAIL=$recipient_mail \
@@ -138,6 +154,11 @@ ID=$id \
 INIT=$init \
 AUDIO_ONLY=$audio_only \
 VIDEO_DEV=$video_dev \
+DISPLAY=$DISPLAY \
+DISPLAY=${display:+:$display} \
+PULSE_SERVER=$pulse_server \
+WITH_ALSA=$with_alsa \
+USER=$user_name \
 docker compose -p ${GW_NAME:-"gw"$id} $COMPOSE_FILE up \
                -d --force-recreate  \
                $SERVICES

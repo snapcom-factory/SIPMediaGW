@@ -33,22 +33,11 @@ class BaseResponse(BaseModel):
     error: Optional[ErrorBlock] = None
 
 # START
-class ProviderConfig(BaseModel):
-    name: str
-    domain: str
-
-class WebRTCDomain(RootModel[Dict[str, ProviderConfig]]):
-    @field_validator("root")
-    def only_one_provider(cls, value):
-        if len(value) != 1:
-            raise ValueError("webrtc_domain must contain exactly one provider")
-        return value
-
 class StartRequest(BaseModel):
-    type: str               # Record / Streaming / SIP
     room: str
     gw_id: str
-    webrtc_domain: Optional[WebRTCDomain] = None
+    main_app: str
+    browsing_name: Optional[str] = None
     from_id: Optional[str] = None
     prefix: Optional[str] = None
     rtmp_dst: Optional[str] = None
@@ -58,7 +47,6 @@ class StartRequest(BaseModel):
     audio_only: Optional[str] = None
     api_key: Optional[str] = None
     recipient_mail: Optional[str] = None
-    main_app: Optional[str] = None
 
 class StartResponse(BaseResponse):
     data: Optional[Dict[str, str]] = None
@@ -159,8 +147,8 @@ class DockerGateway(MediaBackend):
         #    gwSubProc.extend(['-f', req.fromId])
         if req.prefix:
             gwSubProc.extend(['-p', req.prefix])
-        if req.webrtc_domain:
-            gwSubProc.extend(['-w', req.webrtc_domain.model_dump_json()])
+        if req.browsing_name:
+            gwSubProc.extend(['-b', req.browsing_name])
         if req.rtmp_dst:
             gwSubProc.extend(['-u', req.rtmp_dst])
         if req.dial:

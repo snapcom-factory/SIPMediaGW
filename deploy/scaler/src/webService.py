@@ -7,8 +7,8 @@ import inspect
 import re
 import web
 import json
-from deploy.scaler.src.ScalerSIP  import ScalerSIP
-from deploy.scaler.src.ScalerMedia import ScalerMedia
+from ScalerSIP  import ScalerSIP
+from ScalerMedia import ScalerMedia
 
 scalerConfigFile = os.environ.get("SCALER_CONFIG_FILE", "scaler.json")
 cspName =  os.environ.get("CSP_NAME", "outscale")
@@ -42,8 +42,7 @@ def authorize(func):
 class Scaling:
     def __init__(self) -> None:
         # Get a manageInstance object from CSP file name
-
-        sys.path.append(cspName)
+        sys.path.append("{}/providers/{}".format(os.path.dirname(os.path.abspath(__file__)), cspName))
         modName = cspName
         print("CSP mod name: "+modName, flush=True)
         mod = importlib.import_module(modName)
@@ -64,9 +63,11 @@ class Scaling:
     @authorize
     def GET(self, args=None):
         data = web.input()
+        initData = { scalerType.lower() : {'main_app' : self.scaler.config['main_app'],
+                                           'assets_url' : self.scaler.config['assets_url']}}
+        self.scaler.csp.configureInstance("{}/providers/{}/config/{}".format(
+            os.path.dirname(os.path.abspath(__file__)), cspName, cspConfigFile), initData)
         if 'auto' in data.keys():
-            initData = { 'callin' : {}}
-            self.scaler.csp.configureInstance("{}/config/{}".format(cspName, cspConfigFile), initData)
             try:
                 self.scaler.cleanup()
                 if self.scaler.scale() == 0:
@@ -75,23 +76,8 @@ class Scaling:
             except Exception as error:
                 return "The scaler iteration failed: {}".format(error)
         if 'up' in data.keys():
-            roomId = '0'
-            initData = {}
-            if 'roomId' in data.keys():
-                roomId = data['roomId']
-                if 'dialOut' in data.keys():
-                    initData['callout'] = {'dial' : data['dialOut'], 'room' : roomId}
-                if 'rtmpUri' in data.keys():
-                    initData['streaming'] = {'rtmp' : data['rtmpUri'], 'room' : roomId}
-                if 'apiKey' in data.keys() and 'userMail' in data.keys():
-                    initData['recording'] = {'key' : data['apiKey'],
-                                             'mail' : data['userMail'], 'room' : roomId}
-
-            # Ensure that the gateway will be in the "callin" pool (waiting an incoming  call) at the end...
-            initData ['callin'] = {}
-            self.scaler.csp.configureInstance("{}/config/{}".format(cspName, cspConfigFile), initData)
             try:
-                instRes = self.scaler.csp.createInstance('4', name='mediagw')
+                instRes = self.scaler.csp.createInstance('4','4', name='mediagw')
                 web.ctx.status = '200 OK'
                 return json.dumps({"status": "success", "instance": instRes})
             except Exception as error:
