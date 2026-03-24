@@ -16,6 +16,8 @@ services:
       - /tmp
     volumes:
       - ./logs:/var/logs
+      - ./browsing/assets:/var/browsing/assets
+      - ./baresip/config_default:/var/baresip/config_default
     devices:
       - /dev/${VIDEO_DEV}:/dev/video0
       - /dev/snd:/dev/snd

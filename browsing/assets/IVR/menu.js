@@ -130,14 +130,18 @@ class Menu {
         badge.textContent = option.dtmf;
         Object.assign(badge.style, {
             backgroundColor: "#000091",
-            color: "white",
-            fontWeight: "bold",
-            width: "20px",
-            height: "20px",
+            color: "#ffffff",
+            border: "none",
+            fontWeight: "700",
+            width: "22px",
+            height: "22px",
             borderRadius: "50%",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
+            fontSize: "14px",
+            lineHeight: "1",
+            boxSizing: "border-box",
         });
 
         line.appendChild(img);

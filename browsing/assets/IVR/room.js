@@ -30,16 +30,6 @@ export class Room {
             });
     }
 
-    generateRandomString(length = 5) {
-        const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        let result = '';
-        for (let i = 0; i < length; i++) {
-            const randomIndex = Math.floor(Math.random() * characters.length);
-            result += characters.charAt(randomIndex);
-        }
-        return result;
-    }
-
     async initRoom(roomId, onSuccess = () => {}, onError = () => {}) {
         this.roomId = roomId;
         this.roomName = roomId;
@@ -50,21 +40,16 @@ export class Room {
         const timeout = 5000;
         const authURL = this.config['auth_token']['url'];
         try {
-            if (mapperURL) {
+            if (mapperURL && /^\d{10}$/.test(String(this.roomId))) {
                 await this.getConferenceName(mapperURL, timeout, onError);
             }
-            if(!this.mailOwner) {
-                this.roomToken = '';
-            }
+            // if(!this.mailOwner) {
+            //     this.roomToken = '';
+            // }
             if (authURL) {
                 await this.getConferenceToken(authURL, timeout, onError);
             }
-            let name = new URLSearchParams(window.location.search).get("displayName");
-            const ipRegex = /^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}$/;
-            if (ipRegex.test(name)){
-                name = "Meeting Room "+ this.generateRandomString(6);
-            }
-            this.displayName = name;
+            this.displayName = new URLSearchParams(window.location.search).get("displayName");
             onSuccess();
         } catch (err) {
             console.error("Error during Meeting room setup:", err);
@@ -78,12 +63,8 @@ export class Room {
             this.fetchWithTimeout(url, { method: 'GET' }, timeout, onError)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.conference) {
-                        this.roomName = data['url'] || data['conference'].split('@')[0];
-                        this.mappedDomain = data['meeting_instance'] || data['conference'].split('@conference.')[1];
-                        if("mail_owner" in data) {
-                            this.mailOwner = data['mail_owner'];
-                        }
+                    if (data.name) {
+                        this.roomName = data.name;
                         resolve();
                     } else {
                         onError(data);
