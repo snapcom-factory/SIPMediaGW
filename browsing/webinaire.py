@@ -21,7 +21,7 @@ class Webinaire(Browsing):
             print(">>> Removed '--disable-web-security' from Chrome options", flush=True)
 
     def loadPage(self):
-        self.token = ""
+        self.token = self.room['config']['auth_token']['webinaire_token']
         self.driver.execute_cdp_cmd("Network.enable", {})
         self.driver.execute_cdp_cmd(
             "Network.setExtraHTTPHeaders",
