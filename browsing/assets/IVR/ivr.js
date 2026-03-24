@@ -2,7 +2,7 @@ import { Room } from "./room.js";
 
 const titles = {
   fr: { main: "Votre passerelle Visiby", sub: "Solution multi plateforme" },
-  en: { main: "Votre passerelle Renater", sub: "Audio, vidéo et chat" },
+  en: { main: "Your Visiby gateway", sub: "Multi-platform solution" },
 };
 
 const serviceTitle = {
@@ -17,6 +17,10 @@ const prompts = {
     room: {
       jitsi:
         "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
+      bigbluebutton:
+        "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
+      webinaire:
+        "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
       visio:
         "Veuillez entrer le numéro de votre conférence suivi de #<br>(utilisez * pour corriger)",
       teams:
@@ -28,6 +32,10 @@ const prompts = {
       "Please enter the platform number followed by #<br>(use * to correct)",
     room: {
       jitsi:
+        "Please enter your conference number followed by #<br>(use * to correct)",
+      bigbluebutton:
+        "Please enter your conference number followed by #<br>(use * to correct)",
+      webinaire:
         "Please enter your conference number followed by #<br>(use * to correct)",
       visio:
         "Please enter your conference number followed by #<br>(use * to correct)",
