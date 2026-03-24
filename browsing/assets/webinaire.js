@@ -43,7 +43,7 @@ class Webinaire extends UIHelper {
             console.log('[INFO] Waiting for display name input...');
             let nameInput;
             try {
-                nameInput = await this.waitForElement('#joinFormName', { visible: true });
+                nameInput = await this.waitForElement('#fullname', { visible: true });
             } catch (e) {
                 console.error('[✗] Name field not found:', e);
                 return;
