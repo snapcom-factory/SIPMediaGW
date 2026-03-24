@@ -1,55 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <title>Menu IVR</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-    <!-- SPLASH SCREEN -->
-    <div id="bg"></div>
-    <div id="splash">
-      <img src="logo.svg" alt="logo" id="splash-logo">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Menu IVR</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link type="text/css" rel="stylesheet" href="css/dsfr.min.css" />
+  </head>
+  <body>
+    <div class="header-logo" id="header-logo">
+      <header class="fr-header" role="banner">
+        <div class="fr-header__body">
+          <div class="fr-container">
+            <div class="fr-header__body-row">
+              <div class="fr-header__brand fr-enlarge-link">
+                <div class="fr-header__brand-top">
+                  <div class="fr-header__logo">
+                    <a
+                      href="/"
+                      title="République Française"
+                      target="_self"
+                      class="fr-link--md"
+                    >
+                      <p class="fr-logo">République<br />Française</p>
+                    </a>
+                  </div>
+                  <div id="serviceTitle"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
     </div>
-
-    <!-- MAIN UI -->
-    <div id="main" class="hidden ">
+    <div id="main">
+      <div id="title"></div>
       <div id="message"></div>
       <div id="domains" class="hidden"></div>
       <div id="digits" contenteditable="true" spellcheck="false">_____</div>
       <div id="status"></div>
-      <div id="domain-status"></div>
- </div>
-  <script>
-  // Splash → logo → main UI
-  setTimeout(() => {
-    const splash = document.getElementById("splash");
-    const logo   = document.getElementById("splash-logo");
-    const main   = document.getElementById("main");
-
-    // Move logo to the corner
-    logo.classList.add("move-to-corner");
-
-    // Fade-in background
-    document.getElementById("bg").classList.add("visible");
-
-    setTimeout(() => {
-      main.classList.remove("hidden");
-      main.classList.add("fade-in");
-    }, 500);
-
-    // Load ivr.js
-    const script = document.createElement("script");
-    script.src = "ivr.js";
-    script.type = "module";
-    script.onload = () => {
-      splash.style.background = "transparent";
-      splash.style.pointerEvents = "none";
-    };
-    document.body.appendChild(script);
-
-  }, 2200);
-  </script>
-
-</body>
+      <div id="digitsLengthMessage"></div>
+    </div>
+    <div id="powerdBy">
+      Powered by <a href="https://www.renater.fr/" target="_blank">Renater</a>
+    </div>
+    <script type="module" src="ivr.js"></script>
+  </body>
 </html>

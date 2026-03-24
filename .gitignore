@@ -1,3 +1,5 @@
 .vagrant/
 __pycache__
 logs/
+.DS_Store
+browsing/assets/config.json
