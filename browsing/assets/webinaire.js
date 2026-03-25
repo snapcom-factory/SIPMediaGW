@@ -135,6 +135,22 @@ class Webinaire extends UIHelper {
     async browse() {
         try {
             await this.startAudio();
+            const acceptSelector = "[aria-label='Accept recording and continue']";
+            const acceptEl = document.querySelector(acceptSelector);
+            if (acceptEl) {
+                console.log('[INFO] Waiting for recording acceptance (someone should trigger it)...');
+                const timeoutMs = 120000; // safety timeout
+                const pollMs = 500;
+                const start = Date.now();
+                while (Date.now() - start < timeoutMs) {
+                    const el = document.querySelector(acceptSelector);
+                    if (!el) break;
+                    const style = window.getComputedStyle(el);
+                    const visible = style.display !== 'none' && style.visibility !== 'hidden' && el.offsetHeight > 0 && el.offsetWidth > 0;
+                    if (!visible) break;
+                    await new Promise(res => setTimeout(res, pollMs));
+                }
+            }
             await this.startVideo();
             await this.closeParticipantsPanelOnEnter();
             
