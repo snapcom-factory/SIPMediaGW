@@ -38,6 +38,23 @@ class Webinaire extends UIHelper {
         return false;
     }
 
+    async closeParticipantsPanelOnEnter() {
+        if (this._participantsClosedOnEnter) return;
+    
+        try {
+        // wait until the main UI is ready
+        const usersToggle = await this.waitForElement('[accesskey="U"]', { clickable: true }, 15000);
+    
+       
+        usersToggle.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        this._participantsClosedOnEnter = true;
+    
+        console.log("[✓] Participants panel toggled (closed) on enter");
+        } catch (e) {
+        console.warn("[!] Could not close participants panel on enter:", e?.message || e);
+        }
+    }
+
     async join() {
         try {
             console.log('[INFO] Waiting for display name input...');
@@ -102,9 +119,8 @@ class Webinaire extends UIHelper {
         }
     }
 
-    async browse() {
-        try {
-            console.log('[INFO] Enabling microphone...');
+    async startAudio() {
+        console.log('[INFO] Enabling microphone...');
             let micDetails;
             try {
                 micDetails = await this.waitForElement("[data-test='audioModal']", { visible: true });
@@ -114,23 +130,18 @@ class Webinaire extends UIHelper {
             }
             micDetails.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
             await this.tryClickWhileVisible('[data-test="joinEchoTestButton"]');
+    }
 
-            console.log('[INFO] Closing session details modal...');
-            let sessionDetails;
-            try {
-                sessionDetails = await this.waitForElement("[data-test='sessionDetailsModal']", { visible: true });
-            } catch (e) {
-                console.error('[✗] Session details modal not found:', e);
-                return;
-            }
-            var closeBtn = sessionDetails.querySelector("[data-test='closeModal']");
-            closeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-            console.log('[✓] Modal closed');
-
+    async browse() {
+        try {
+            await this.startAudio();
             await this.startVideo();
-
+            await this.closeParticipantsPanelOnEnter();
+            
         } catch (error) {
             console.error('[✗] Join process failed:', error);
+        } finally {
+            this.joined = true;
         }
     }
 
@@ -151,7 +162,10 @@ class Webinaire extends UIHelper {
         if (key == "5")
             document.querySelector('[accesskey="U"]').click();
         if (key == "6")
-            document.querySelector("[aria-label='Accept recording and continue']").click();
+            document.querySelector('[aria-label="Accept recording and continue"]').click();
+            if (document.querySelector("[data-test='joinAudio']")) {
+                this.startAudio();
+            }
         if (key == "s")
             document.querySelector("[data-test='startScreenShare']").click();
     }
