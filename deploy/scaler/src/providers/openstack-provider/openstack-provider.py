@@ -1,75 +1,58 @@
 #!/usr/bin/env python
 
 import json
-import uuid
-from ipaddress import ip_address
-from typing import Dict, List, Optional, Tuple
+import time
+from ipaddress import ip_address, ip_network
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import openstack
 
 from manageInstance import ManageInstance
 
 
 class OpenstackProvider(ManageInstance):
+
     def __init__(self, profile):
         self.profile = profile
         self.conn = None
         self.instName = None
-        self.instType = None
+        self.instType = {}
         self.ami = None
-        self.network_ref = None
-        self.network_id = None
-        self.network_name = None
-        self.fip_network_ref = None
-        self.fip_network_id = None
-        self.fip_network_name = None
-        self.secuGrp = None
-        self.keypair = None
+        self.network = None
+        self.subnet = None
+        self._primarySubnetCidr = None
+        # Interface selection for the "primary" NIC.
+        # Values can be either Neutron network names or subnet names.
+        # If `interface_1.priv` is set -> VM fixed IP comes from this.
+        # If `interface_1.pub` is set -> floating IP is allocated from this.
+        self.interface1PubRef = None
+        self.interface1PrivRef = None
+        # Optional second private NIC for admin traffic.
+        # Mapped to OpenStack Neutron network/subnet names from provider config.
+        self.adminNetwork = None
+        self.adminSubnet = None
+        self.secuGrp = {}
+        self.keyPair = None
         self.userData = ""
-        self.flavor_cpu = {}
-        self.flavor_cache = {}
+        self._flavorVcpuCache = {}
 
-    @staticmethod
-    def _is_uuid(value: str) -> bool:
-        try:
-            uuid.UUID(value)
-            return True
-        except Exception:
-            return False
+    def _connect(self, profileCfg):
+        cfg = profileCfg if profileCfg else {}
 
-    def _connect(self, profile_cfg: Optional[Dict]):
-        import openstack
+        # OVH/OpenStack application credentials support.
+        if cfg.get("client_id") and cfg.get("client_secret"):
+            return openstack.connection.Connection(
+                auth={
+                    "auth_url": cfg.get("auth_url"),
+                    "application_credential_id": cfg.get("client_id"),
+                    "application_credential_secret": cfg.get("client_secret"),
+                },
+                auth_type="v3applicationcredential",
+                region_name=cfg.get("region"),
+                identity_interface=cfg.get("interface", "public"),
+            )
 
-        if not profile_cfg:
-            return openstack.connect()
-
-        cloud = profile_cfg.get("cloud")
-        region = profile_cfg.get("region_name") or profile_cfg.get("region")
-        interface = profile_cfg.get("interface")
-        verify = profile_cfg.get("verify")
-        cacert = profile_cfg.get("cacert")
-        app_name = profile_cfg.get("app_name")
-        app_version = profile_cfg.get("app_version")
-
-        if cloud:
-            kwargs = {"cloud": cloud}
-            if region:
-                kwargs["region_name"] = region
-            if interface:
-                kwargs["interface"] = interface
-            if verify is not None:
-                kwargs["verify"] = verify
-            if cacert:
-                kwargs["cacert"] = cacert
-            if app_name:
-                kwargs["app_name"] = app_name
-            if app_version:
-                kwargs["app_version"] = app_version
-            return openstack.connect(**kwargs)
-
-        kwargs = {}
-        auth = profile_cfg.get("auth", {})
-        if isinstance(auth, dict):
-            kwargs.update(auth)
-
+        auth = {}
         for key in [
             "auth_url",
             "username",
@@ -81,293 +64,596 @@ class OpenstackProvider(ManageInstance):
             "project_domain_name",
             "project_domain_id",
         ]:
-            if key in profile_cfg:
-                kwargs[key] = profile_cfg[key]
+            if cfg.get(key) is not None:
+                auth[key] = cfg.get(key)
 
-        if region:
-            kwargs["region_name"] = region
-        if interface:
-            kwargs["interface"] = interface
-        if verify is not None:
-            kwargs["verify"] = verify
-        if cacert:
-            kwargs["cacert"] = cacert
-        if app_name:
-            kwargs["app_name"] = app_name
-        if app_version:
-            kwargs["app_version"] = app_version
+        kwargs = {
+            "auth": auth if auth else None,
+            "region_name": cfg.get("region"),
+            "identity_interface": cfg.get("interface", "public"),
+        }
+        return openstack.connection.Connection(**{k: v for k, v in kwargs.items() if v is not None})
 
-        return openstack.connect(**kwargs) if kwargs else openstack.connect()
-
-    def _resolve_network(self, ref: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-        if not ref:
-            return None, None
-
-        net = None
-        subnet = None
-        if self._is_uuid(ref):
-            try:
-                net = self.conn.network.get_network(ref)
-            except Exception:
-                net = None
-            if not net:
-                try:
-                    subnet = self.conn.network.get_subnet(ref)
-                except Exception:
-                    subnet = None
-        else:
-            net = self.conn.network.find_network(ref)
-            if not net:
-                subnet = self.conn.network.find_subnet(ref)
-
-        if subnet and not net:
-            try:
-                net = self.conn.network.get_network(subnet.network_id)
-            except Exception:
-                net = None
-
-        if not net:
-            raise RuntimeError(f"Network or subnet not found: {ref}")
-        return net.id, net.name
-
-    def _resolve_security_groups(self) -> List[str]:
-        if not self.secuGrp:
-            return []
-
-        groups: List[str] = []
-        if isinstance(self.secuGrp, dict):
-            for key in ["admin", "app"]:
-                if self.secuGrp.get(key):
-                    groups.append(self.secuGrp[key])
-        elif isinstance(self.secuGrp, list):
-            groups = [g for g in self.secuGrp if g]
-        else:
-            groups = [self.secuGrp]
-
-        resolved: List[str] = []
-        for group in groups:
-            sg = self.conn.network.find_security_group(group)
-            resolved.append(sg.name if sg else group)
-        return resolved
-
-  
     def configureInstance(self, configFile, initData):
         with open(configFile) as f:
             instConfig = json.load(f)
 
-        profile_cfg = instConfig.get("profile", {}).get(self.profile, {})
-        self.conn = self._connect(profile_cfg)
+        profileCfg = instConfig.get("profile", {}).get(self.profile, {})
+        self.conn = self._connect(profileCfg)
 
         self.instName = instConfig.get("name")
         self.instType = instConfig.get("instance_type_by_cpu_num", {})
         self.ami = instConfig.get("instance_image")
-        self.network_ref = instConfig.get("network") or instConfig.get("subnet")
-        self.fip_network_ref = instConfig.get("floating_ip_network")
-        self.secuGrp = instConfig.get("security_group")
-        self.keypair = instConfig.get("keypair")
-        self.flavor_cpu = {v: int(k) for k, v in self.instType.items()}
+        self.network = instConfig.get("network")
+        self.subnet = instConfig.get("subnet")
+        iface1 = instConfig.get("interface_1", {}) or {}
+        # Accept either "priv"/"pub" keys or explicit names "priv_subnet"/"pub_subnet".
+        self.interface1PrivRef = iface1.get("priv") or iface1.get("priv_subnet")
+        self.interface1PubRef = iface1.get("pub") or iface1.get("pub_subnet")
+        self.adminNetwork = instConfig.get("admin_network")
+        self.adminSubnet = instConfig.get("admin_subnet")
+        self.secuGrp = instConfig.get("security_group", {})
+        self.keyPair = instConfig.get("key_pair")
+        self.userData = ""
+        self._primarySubnetCidr = None
 
-        self.network_id, self.network_name = self._resolve_network(self.network_ref)
-        if self.fip_network_ref:
-            self.fip_network_id, self.fip_network_name = self._resolve_network(self.fip_network_ref)
-
-    def _get_server_ips(self, server) -> Tuple[Optional[str], Optional[str]]:
-        priv_ip = None
-        pub_ip = None
-        addresses = server.addresses or {}
-        for net_name, addrs in addresses.items():
-            for addr in addrs:
-                ip_addr = addr.get("addr") or addr.get("address")
-                ip_type = addr.get("OS-EXT-IPS:type") or addr.get("type")
-                if ip_type == "floating":
-                    pub_ip = ip_addr
-                elif ip_type == "fixed":
-                    if self.network_name is None or net_name == self.network_name:
-                        priv_ip = ip_addr
-        return priv_ip, pub_ip
-
-    def _get_cpu_count(self, server) -> Optional[int]:
-        metadata = getattr(server, "metadata", {}) or {}
-        if "cpu_count" in metadata:
+        # Best-effort: derive the subnet CIDR for the "primary" fixed IP.
+        # This makes _getServerIps() behave like the Outscale provider which
+        # relies on a single SubnetId.
+        primaryRef = self.interface1PrivRef or self.interface1PubRef
+        if primaryRef:
             try:
-                return int(metadata["cpu_count"])
+                sub = self.conn.network.find_subnet(primaryRef)
+                if sub and getattr(sub, "cidr", None):
+                    self._primarySubnetCidr = sub.cidr
             except Exception:
                 pass
 
-        flavor = getattr(server, "flavor", {}) or {}
-        flavor_id = flavor.get("id")
-        if not flavor_id:
-            return None
+            # If we couldn't resolve a subnet CIDR (primaryRef may be a network name),
+            # fall back to using self.network (may still be helpful for fixed IPs).
+            if self._primarySubnetCidr is None and not self.network:
+                try:
+                    net = self.conn.network.find_network(primaryRef)
+                    if net:
+                        self.network = getattr(net, "name", None) or primaryRef
+                except Exception:
+                    pass
 
-        if flavor_id not in self.flavor_cache:
-            flv = self.conn.compute.get_flavor(flavor_id)
-            self.flavor_cache[flavor_id] = getattr(flv, "vcpus", None)
+        if self._primarySubnetCidr is None and self.subnet:
+            try:
+                sub = self.conn.network.find_subnet(self.subnet)
+                if sub and getattr(sub, "cidr", None):
+                    self._primarySubnetCidr = sub.cidr
+            except Exception:
+                pass
 
-        vcpus = self.flavor_cache.get(flavor_id)
-        return int(vcpus) if vcpus is not None else None
+        scriptCfg = instConfig.get("user_data", {}).get("script", {})
+        self.userData += "\n".join(scriptCfg.get("common", []))
+
+        if "sip" in initData:
+            sipCfg = instConfig.get("user_data", {})
+
+            sipRegistrar = None
+            if "sip_registrar" in sipCfg:
+                sipRegistrar = sipCfg["sip_registrar"].get("priv") or sipCfg["sip_registrar"].get("pub")
+            if "registrar" not in initData["sip"]:
+                initData["sip"]["registrar"] = sipRegistrar
+
+            outboundProxy = None
+            if "outbound_proxy" in sipCfg:
+                outboundProxy = sipCfg["outbound_proxy"].get("priv") or sipCfg["outbound_proxy"].get("pub")
+            if "proxy" not in initData["sip"]:
+                initData["sip"]["proxy"] = outboundProxy
+
+            turnSrv = None
+            if "turn_server" in sipCfg:
+                turnSrv = sipCfg["turn_server"].get("priv") or sipCfg["turn_server"].get("pub")
+            if "turn" not in initData["sip"]:
+                initData["sip"]["turn"] = turnSrv
+
+        for act in initData:
+            actionScript = scriptCfg.get(act, [])
+            if not actionScript:
+                continue
+            self.userData += "\n"
+            self.userData += "\n".join(actionScript).format(**initData[act])
+
+    def _getServerIps(self, server):
+        privIp = None
+        pubIp = None
+        addresses = server.addresses or {}
+        primarySubnetCidr = self._primarySubnetCidr
+
+        for netName, addrs in addresses.items():
+            for addr in addrs:
+                ipAddr = addr.get("addr") or addr.get("address")
+                ipType = addr.get("OS-EXT-IPS:type") or addr.get("type")
+                if ipType == "floating":
+                    pubIp = ipAddr
+                elif ipType == "fixed":
+                    if not ipAddr:
+                        continue
+                    if primarySubnetCidr:
+                        try:
+                            if ip_address(ipAddr) in ip_network(primarySubnetCidr, strict=False):
+                                privIp = ipAddr
+                        except Exception:
+                            # If CIDR parsing fails, ignore and fall back to net-name matching.
+                            pass
+                    elif not self.network or netName == self.network:
+                        privIp = ipAddr
+        return privIp, pubIp
+
+    def _getServerVcpus(self, server):
+        flavorId = None
+        if getattr(server, "flavor", None):
+            flavorId = server.flavor.get("id")
+        if not flavorId:
+            return 0
+
+        if flavorId not in self._flavorVcpuCache:
+            flv = self.conn.compute.get_flavor(flavorId)
+            self._flavorVcpuCache[flavorId] = int(getattr(flv, "vcpus", 0) or 0)
+        return self._flavorVcpuCache[flavorId]
 
     def enumerateInstances(self):
         if not self.conn:
             return []
 
-        app_sg = None
-        if isinstance(self.secuGrp, dict):
-            app_sg = self.secuGrp.get("app")
-
-        instances = []
+        appSg = self.secuGrp.get("app") if isinstance(self.secuGrp, dict) else None
+        instDict = []
         for server in self.conn.compute.servers(details=True):
-            status = (server.status or "").upper()
-            if status != "ACTIVE":
+            if (server.status or "").upper() != "ACTIVE":
                 continue
 
-            if app_sg:
-                sg_names = set()
+            if appSg:
+                sgNames = set()
                 for sg in server.security_groups or []:
                     if isinstance(sg, dict):
-                        sg_names.add(sg.get("name"))
+                        sgNames.add(sg.get("name"))
                     else:
-                        sg_names.add(sg)
-                if app_sg not in sg_names:
+                        sgNames.add(sg)
+                if appSg not in sgNames:
                     continue
 
-            priv_ip, pub_ip = self._get_server_ips(server)
-            if self.network_name and not priv_ip:
-                continue
+            privIp, pubIp = self._getServerIps(server)
+            startTime = getattr(server, "created_at", None) or getattr(server, "created", None)
+            cpuCnt = self._getServerVcpus(server)
 
-            cpu_cnt = self._get_cpu_count(server) or 0
-            start_time = getattr(server, "created_at", None) or getattr(server, "created", None)
-
-            instances.append(
+            instDict.append(
                 {
-                    "start": start_time,
-                    "addr": {"priv": priv_ip, "pub": pub_ip},
-                    "cpu_count": int(cpu_cnt),
+                    "start": startTime,
+                    "addr": {"priv": privIp, "pub": pubIp},
+                    "cpu_count": int(cpuCnt),
                 }
             )
+        return instDict
 
-        return instances
-
-    def _build_name(self, name: Optional[str]) -> str:
-        if name:
-            return f"{name}.{self.instName}"
-        return self.instName or "sipmediagw"
-
-    def createInstance(self, numCPU, name=None, ip=None):
-        if not self.conn:
-            raise RuntimeError("Provider is not configured. Call configureInstance first.")
-
-        flavor_ref = self.instType.get(str(numCPU))
-        if not flavor_ref:
-            raise RuntimeError(f"No flavor configured for CPU count: {numCPU}")
-
-        flavor = self.conn.compute.find_flavor(flavor_ref)
-        if not flavor:
-            try:
-                flavor = self.conn.compute.get_flavor(flavor_ref)
-            except Exception:
-                flavor = None
-        if not flavor:
-            raise RuntimeError(f"Flavor not found: {flavor_ref}")
-
-        image = self.conn.compute.find_image(self.ami)
-        if not image:
-            try:
-                image = self.conn.compute.get_image(self.ami)
-            except Exception:
-                image = None
-        if not image:
-            raise RuntimeError(f"Image not found: {self.ami}")
-
-        if not self.network_id:
-            raise RuntimeError("Network is not configured")
-
-        networks = [{"uuid": self.network_id}]
-        sec_groups = self._resolve_security_groups()
-        server_name = self._build_name(name)
-
-        create_kwargs = {
-            "name": server_name,
-            "image_id": image.id,
-            "flavor_id": flavor.id,
-            "networks": networks,
-            "metadata": {"cpu_count": str(numCPU), "gw_prefix": self.instName or ""},
-        }
-        if sec_groups:
-            create_kwargs["security_groups"] = [{"name": sg} for sg in sec_groups]
-        if self.keypair:
-            create_kwargs["key_name"] = self.keypair
-        if self.userData:
-            create_kwargs["user_data"] = self.userData
-
-        server = self.conn.compute.create_server(**create_kwargs)
-        server = self.conn.compute.wait_for_server(server)
-        server = self.conn.compute.get_server(server.id)
-
-        pub_ip = None
-        if ip:
-            pub_ip = ip
-        elif self.fip_network_id:
-            fip = self.conn.network.create_ip(floating_network_id=self.fip_network_id)
-            pub_ip = fip.floating_ip_address
-
-        if pub_ip:
-            self.conn.compute.add_floating_ip_to_server(server, pub_ip)
-
-        priv_ip, actual_pub = self._get_server_ips(server)
-        if actual_pub:
-            pub_ip = actual_pub
-
-        print(
-            f"Created Instance: {server.id}, {priv_ip}, {pub_ip}, {numCPU}VCPUs",
-            flush=True,
-        )
-
-        return {"id": server.id, "ip": pub_ip}
-
-    def _find_server_by_ip(self, ip: str):
+    def _findServerByIp(self, targetIp):
         for server in self.conn.compute.servers(details=True):
             addresses = server.addresses or {}
             for addrs in addresses.values():
                 for addr in addrs:
-                    if addr.get("addr") == ip or addr.get("address") == ip:
+                    ipAddr = addr.get("addr") or addr.get("address")
+                    if ipAddr == targetIp:
                         return server
         return None
+
+    def _resolvePortIdForFixedIp(self, server, fixedIp):
+        """
+        Best-effort: find the Neutron port on `server` that owns `fixedIp`.
+        We use it to attach the floating IP to the private interface (like Outscale).
+        """
+        if not fixedIp or not server or not getattr(server, "id", None):
+            return None
+
+        try:
+            ports_iter = self.conn.network.ports(device_id=server.id)
+        except Exception:
+            ports_iter = self.conn.network.ports()
+
+        try:
+            for port in ports_iter:
+                fixedIps = getattr(port, "fixed_ips", None) or []
+                for fi in fixedIps:
+                    if isinstance(fi, dict):
+                        ipAddr = (
+                            fi.get("ip_address")
+                            or fi.get("ip")
+                            or fi.get("address")
+                        )
+                    else:
+                        ipAddr = fi
+                    if ipAddr == fixedIp:
+                        return port.id
+        except Exception:
+            return None
+
+        return None
+
+    def _resolveFloatingNetworkId(self):
+        # Floating IP allocation expects a floating network id.
+        # We resolve it from `interface_1.pub` if provided (subnet preferred, fallback to network),
+        # otherwise keep legacy behavior (`subnet`/`network`).
+        if self.interface1PubRef:
+            try:
+                sub = self.conn.network.find_subnet(self.interface1PubRef)
+                return sub.network_id if sub else None
+            except Exception:
+                # Might be a network name instead of a subnet name.
+                pass
+            try:
+                net = self.conn.network.find_network(self.interface1PubRef)
+                return net.id if net else None
+            except Exception:
+                return None
+
+        if self.subnet:
+            try:
+                sub = self.conn.network.find_subnet(self.subnet)
+                return sub.network_id if sub else None
+            except Exception:
+                pass
+
+        if self.network:
+            try:
+                net = self.conn.network.find_network(self.network)
+                return net.id if net else None
+            except Exception:
+                pass
+
+        return None
+
+    def _buildPrimaryNic(self):
+        """
+        Build the NIC list for the primary interface.
+        Preference:
+          1) interface_1.priv (fixed IP)
+          2) interface_1.pub (if priv is missing)
+          3) legacy network/subnet
+        Returns a list of one OpenStack networks entry for `create_server()`.
+        """
+        primaryRef = self.interface1PrivRef or self.interface1PubRef
+
+        if primaryRef:
+            # If it's a subnet name: use net-id + fixed-ip allocation.
+            try:
+                subnet = self.conn.network.find_subnet(primaryRef)
+                if subnet:
+                    return [{"net-id": subnet.network_id, "v4-fixed-ip": None}]
+            except Exception:
+                pass
+            # If it's a network name: attach using uuid.
+            try:
+                net = self.conn.network.find_network(primaryRef)
+                if net:
+                    return [{"uuid": net.id}]
+            except Exception:
+                pass
+
+        # Legacy behavior fallback.
+        if self.subnet:
+            subnet = self.conn.network.find_subnet(self.subnet)
+            if subnet:
+                return [{"net-id": subnet.network_id, "v4-fixed-ip": None}]
+
+        if self.network:
+            net = self.conn.network.find_network(self.network)
+            if net:
+                return [{"uuid": net.id}]
+
+        return []
+
+    def createInstance(self, numCPU, gigaRAM, name=None, ip=None):
+        if not self.conn:
+            raise RuntimeError("Provider not configured")
+
+        flavorName = self.instType.get(str(numCPU), {}).get(str(gigaRAM))
+        if not flavorName:
+            raise RuntimeError("No instance type for {} vCPU / {} GiB".format(numCPU, gigaRAM))
+
+        flavor = self.conn.compute.find_flavor(flavorName)
+        image = self.conn.compute.find_image(self.ami)
+        if not flavor:
+            raise RuntimeError("Flavor not found: {}".format(flavorName))
+        if not image:
+            raise RuntimeError("Image not found: {}".format(self.ami))
+
+        nics = self._buildPrimaryNic()
+        if not nics:
+            raise RuntimeError("No primary NIC could be built (check interface_1/ network/ subnet config)")
+
+        # Optional admin NIC.
+        if self.adminSubnet:
+            admin_subnet = self.conn.network.find_subnet(self.adminSubnet)
+            if admin_subnet:
+                nics.append({"net-id": admin_subnet.network_id, "v4-fixed-ip": None})
+            else:
+                raise RuntimeError("Admin subnet not found: {}".format(self.adminSubnet))
+        elif self.adminNetwork:
+            admin_net = self.conn.network.find_network(self.adminNetwork)
+            if admin_net:
+                nics.append({"uuid": admin_net.id})
+            else:
+                raise RuntimeError("Admin network not found: {}".format(self.adminNetwork))
+
+        secGroups = []
+        if isinstance(self.secuGrp, dict):
+            for key in ["admin", "app"]:
+                sg = self.secuGrp.get(key)
+                if sg:
+                    secGroups.append({"name": sg})
+
+        serverName = "{}.{}".format(self.instName, name) if name else self.instName
+
+        server = self.conn.compute.create_server(
+            name=serverName,
+            image_id=image.id,
+            flavor_id=flavor.id,
+            networks=nics,
+            security_groups=secGroups if secGroups else None,
+            key_name=self.keyPair,
+            user_data=self.userData,
+            metadata={"cpu_count": str(numCPU)},
+        )
+        server = self.conn.compute.wait_for_server(server)
+        server = self.conn.compute.get_server(server.id)
+
+        privIp, actualPubIp = self._getServerIps(server)
+        pubIp = ip or actualPubIp
+
+        # Allocate/associate floating IP to the port that matches privIp.
+        if not pubIp:
+            fipNetId = self._resolveFloatingNetworkId()
+            if fipNetId:
+                portId = self._resolvePortIdForFixedIp(server, privIp)
+                if portId:
+                    fip = self.conn.network.create_ip(
+                        floating_network_id=fipNetId, port_id=portId
+                    )
+                    pubIp = fip.floating_ip_address
+                else:
+                    fip = self.conn.network.create_ip(floating_network_id=fipNetId)
+                    pubIp = fip.floating_ip_address
+                    if pubIp:
+                        self.conn.compute.add_floating_ip_to_server(server, pubIp)
+        elif privIp:
+            # If the caller provided a floating IP, try to associate it to the private port.
+            portId = self._resolvePortIdForFixedIp(server, privIp)
+            if portId:
+                try:
+                    fip = self.conn.network.find_ip(pubIp)
+                    if fip:
+                        self.conn.network.update_ip(fip, port_id=portId)
+                except Exception:
+                    # Fallback to the older behavior.
+                    try:
+                        self.conn.compute.add_floating_ip_to_server(server, pubIp)
+                    except Exception:
+                        pass
+
+        server = self.conn.compute.get_server(server.id)
+        privIp, actualPubIp = self._getServerIps(server)
+        if actualPubIp:
+            pubIp = actualPubIp
+
+        print(
+            "Created Instance: {}, {}, {}, {}VCPUs, {}G".format(
+                server.id, privIp, pubIp, numCPU, gigaRAM
+            ),
+            flush=True,
+        )
+        return {"id": server.id, "ip": pubIp}
+
+    def _createServerOnly(self, numCPU, gigaRAM, name=None):
+        flavorName = self.instType.get(str(numCPU), {}).get(str(gigaRAM))
+        if not flavorName:
+            raise RuntimeError("No instance type for {} vCPU / {} GiB".format(numCPU, gigaRAM))
+
+        flavor = self.conn.compute.find_flavor(flavorName)
+        image = self.conn.compute.find_image(self.ami)
+        if not flavor:
+            raise RuntimeError("Flavor not found: {}".format(flavorName))
+        if not image:
+            raise RuntimeError("Image not found: {}".format(self.ami))
+
+        nics = self._buildPrimaryNic()
+        if not nics:
+            raise RuntimeError("No primary NIC could be built (check interface_1/ network/ subnet config)")
+
+        # Optional admin NIC.
+        if self.adminSubnet:
+            admin_subnet = self.conn.network.find_subnet(self.adminSubnet)
+            if admin_subnet:
+                nics.append({"net-id": admin_subnet.network_id, "v4-fixed-ip": None})
+            else:
+                raise RuntimeError("Admin subnet not found: {}".format(self.adminSubnet))
+        elif self.adminNetwork:
+            admin_net = self.conn.network.find_network(self.adminNetwork)
+            if admin_net:
+                nics.append({"uuid": admin_net.id})
+            else:
+                raise RuntimeError("Admin network not found: {}".format(self.adminNetwork))
+
+        secGroups = []
+        if isinstance(self.secuGrp, dict):
+            for key in ["admin", "app"]:
+                sg = self.secuGrp.get(key)
+                if sg:
+                    secGroups.append({"name": sg})
+
+        serverName = "{}.{}".format(self.instName, name) if name else self.instName
+        server = self.conn.compute.create_server(
+            name=serverName,
+            image_id=image.id,
+            flavor_id=flavor.id,
+            networks=nics,
+            security_groups=secGroups if secGroups else None,
+            key_name=self.keyPair,
+            user_data=self.userData,
+            metadata={"cpu_count": str(numCPU)},
+        )
+        return server.id
+
+    def createInstancesParallel(self, count, numCPU, gigaRAM, name=None, timeoutSeconds=None):
+        if not self.conn:
+            raise RuntimeError("Provider not configured")
+        if count <= 0:
+            return []
+
+        timeout = int(timeoutSeconds if timeoutSeconds is not None else 300)
+        maxWorkers = max(1, int(count))
+        createdIds = []
+        results = []
+        failures = 0
+
+        # Dispatch creation requests in parallel.
+        with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
+            baseName = name
+            futures = [
+                executor.submit(
+                    self._createServerOnly,
+                    numCPU,
+                    gigaRAM,
+                    ("{}-{}".format(baseName, i) if baseName else None),
+                )
+                for i in range(count)
+            ]
+            for fut in as_completed(futures):
+                try:
+                    createdIds.append(fut.result())
+                except Exception as err:
+                    failures += 1
+                    print("Create request failed: {}".format(err), flush=True)
+
+        if not createdIds:
+            return []
+
+        startTime = time.time()
+        pending = set(createdIds)
+        readyIds = []
+        while pending and (time.time() - startTime) < timeout:
+            doneNow = []
+            for serverId in list(pending):
+                try:
+                    server = self.conn.compute.get_server(serverId)
+                except Exception:
+                    continue
+                status = (getattr(server, "status", "") or "").upper()
+                if status == "ACTIVE":
+                    doneNow.append(serverId)
+                    readyIds.append(serverId)
+                elif status == "ERROR":
+                    doneNow.append(serverId)
+                    failures += 1
+                    print("Server {} in ERROR state".format(serverId), flush=True)
+                    # If the VM failed to boot, immediately clean it up so it
+                    # doesn't keep consuming compute resources.
+                    try:
+                        self.conn.compute.delete_server(serverId, ignore_missing=True)
+                        print(
+                            "Server {} deleted after ERROR state".format(serverId),
+                            flush=True,
+                        )
+                    except Exception as err:
+                        print(
+                            "Failed to delete server {} after ERROR: {}".format(serverId, err),
+                            flush=True,
+                        )
+            for serverId in doneNow:
+                pending.discard(serverId)
+            if pending:
+                time.sleep(5)
+
+        # Cleanup timed-out servers.
+        if pending:
+            for serverId in list(pending):
+                failures += 1
+                try:
+                    self.conn.compute.delete_server(serverId, ignore_missing=True)
+                except Exception:
+                    pass
+                print("Server {} creation timed out after {}s".format(serverId, timeout), flush=True)
+
+        # Attach floating IPs for ACTIVE instances.
+        for serverId in readyIds:
+            server = self.conn.compute.get_server(serverId)
+            pubIp = None
+            privIp, actualPubIp = self._getServerIps(server)
+            pubIp = actualPubIp
+
+            if not pubIp:
+                fipNetId = self._resolveFloatingNetworkId()
+                if fipNetId:
+                    portId = self._resolvePortIdForFixedIp(server, privIp)
+                    if portId:
+                        fip = self.conn.network.create_ip(
+                            floating_network_id=fipNetId, port_id=portId
+                        )
+                        pubIp = fip.floating_ip_address
+                    else:
+                        fip = self.conn.network.create_ip(floating_network_id=fipNetId)
+                        pubIp = fip.floating_ip_address
+                        if pubIp:
+                            self.conn.compute.add_floating_ip_to_server(server, pubIp)
+
+            server = self.conn.compute.get_server(serverId)
+            privIp, actualPubIp = self._getServerIps(server)
+            if actualPubIp:
+                pubIp = actualPubIp
+
+            print(
+                "Created Instance: {}, {}, {}, {}VCPUs, {}G".format(
+                    server.id, privIp, pubIp, numCPU, gigaRAM
+                ),
+                flush=True,
+            )
+            results.append({"id": server.id, "ip": pubIp})
+
+        print(
+            "OpenStack batch create done: requested={}, started={}, active={}, failed={}".format(
+                count, len(createdIds), len(results), failures
+            ),
+            flush=True,
+        )
+        return results
 
     def destroyInstances(self, ipList):
         if not self.conn:
             return
 
         for ip in ipList:
-            server = self._find_server_by_ip(ip)
-            pub_ip = None
-            priv_ip = None
-
-            try:
-                is_private = ip_address(ip).is_private
-            except Exception:
-                is_private = False
+            instanceId = None
+            pubIp = None
+            privIp = None
+            server = self._findServerByIp(ip)
 
             if server:
-                priv_ip, pub_ip = self._get_server_ips(server)
-                if is_private:
-                    priv_ip = ip
-                else:
-                    pub_ip = ip
+                instanceId = server.id
+                privIp, pubIp = self._getServerIps(server)
 
-                if pub_ip:
-                    try:
-                        self.conn.compute.remove_floating_ip_from_server(server, pub_ip)
-                    except Exception:
-                        pass
-                    fip = self.conn.network.find_ip(pub_ip)
-                    if fip:
-                        self.conn.network.delete_ip(fip)
+            try:
+                isPrivate = ip_address(ip).is_private
+            except Exception:
+                isPrivate = False
 
-                self.conn.compute.delete_server(server, ignore_missing=True)
+            if isPrivate:
+                privIp = ip
             else:
-                if not is_private:
-                    fip = self.conn.network.find_ip(ip)
-                    if fip:
-                        self.conn.network.delete_ip(fip)
+                pubIp = ip
 
-            print(f"Deleted Instance: {server.id if server else None}, {priv_ip}, {pub_ip}", flush=True)
+            if server and pubIp:
+                try:
+                    self.conn.compute.remove_floating_ip_from_server(server, pubIp)
+                except Exception:
+                    pass
+
+            if server:
+                self.conn.compute.delete_server(server, ignore_missing=True)
+
+            if pubIp:
+                fip = self.conn.network.find_ip(pubIp)
+                if fip:
+                    self.conn.network.delete_ip(fip)
+
+            print("Deleted Instance: {}, {}, {}".format(instanceId, privIp, pubIp), flush=True)
