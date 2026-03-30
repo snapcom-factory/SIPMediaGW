@@ -445,6 +445,36 @@ class OpenstackProvider(ManageInstance):
         )
         return {"id": server.id, "ip": pubIp}
 
+    def _ensureFloatingIp(self, server, privIp):
+        """
+        Ensure `server` has a floating IP.
+        Returns the floating IP address if present/allocated, otherwise None.
+        """
+        if not server:
+            return None
+
+        _, actualPubIp = self._getServerIps(server)
+        if actualPubIp:
+            return actualPubIp
+
+        fipNetId = self._resolveFloatingNetworkId()
+        if not fipNetId:
+            return None
+
+        try:
+            portId = self._resolvePortIdForFixedIp(server, privIp)
+            if portId:
+                fip = self.conn.network.create_ip(floating_network_id=fipNetId, port_id=portId)
+                return getattr(fip, "floating_ip_address", None)
+
+            fip = self.conn.network.create_ip(floating_network_id=fipNetId)
+            pubIp = getattr(fip, "floating_ip_address", None)
+            if pubIp:
+                self.conn.compute.add_floating_ip_to_server(server, pubIp)
+            return pubIp
+        except Exception:
+            return None
+
     def _createServerOnly(self, numCPU, gigaRAM, name=None):
         flavorName = self.instType.get(str(numCPU), {}).get(str(gigaRAM))
         if not flavorName:
@@ -531,7 +561,6 @@ class OpenstackProvider(ManageInstance):
 
         startTime = time.time()
         pending = set(createdIds)
-        readyIds = []
         while pending and (time.time() - startTime) < timeout:
             doneNow = []
             for serverId in list(pending):
@@ -542,7 +571,29 @@ class OpenstackProvider(ManageInstance):
                 status = (getattr(server, "status", "") or "").upper()
                 if status == "ACTIVE":
                     doneNow.append(serverId)
-                    readyIds.append(serverId)
+                    pubIp = None
+                    privIp, actualPubIp = self._getServerIps(server)
+                    pubIp = actualPubIp
+
+                    if not pubIp:
+                        pubIp = self._ensureFloatingIp(server, privIp)
+
+                    # Refresh server to pick up a floating IP added asynchronously.
+                    try:
+                        server = self.conn.compute.get_server(serverId)
+                        _, actualPubIp2 = self._getServerIps(server)
+                        if actualPubIp2:
+                            pubIp = actualPubIp2
+                    except Exception:
+                        pass
+
+                    print(
+                        "Created Instance: {}, {}, {}, {}VCPUs, {}G".format(
+                            serverId, privIp, pubIp, numCPU, gigaRAM
+                        ),
+                        flush=True,
+                    )
+                    results.append({"id": serverId, "ip": pubIp})
                 elif status == "ERROR":
                     doneNow.append(serverId)
                     failures += 1
@@ -574,41 +625,6 @@ class OpenstackProvider(ManageInstance):
                 except Exception:
                     pass
                 print("Server {} creation timed out after {}s".format(serverId, timeout), flush=True)
-
-        # Attach floating IPs for ACTIVE instances.
-        for serverId in readyIds:
-            server = self.conn.compute.get_server(serverId)
-            pubIp = None
-            privIp, actualPubIp = self._getServerIps(server)
-            pubIp = actualPubIp
-
-            if not pubIp:
-                fipNetId = self._resolveFloatingNetworkId()
-                if fipNetId:
-                    portId = self._resolvePortIdForFixedIp(server, privIp)
-                    if portId:
-                        fip = self.conn.network.create_ip(
-                            floating_network_id=fipNetId, port_id=portId
-                        )
-                        pubIp = fip.floating_ip_address
-                    else:
-                        fip = self.conn.network.create_ip(floating_network_id=fipNetId)
-                        pubIp = fip.floating_ip_address
-                        if pubIp:
-                            self.conn.compute.add_floating_ip_to_server(server, pubIp)
-
-            server = self.conn.compute.get_server(serverId)
-            privIp, actualPubIp = self._getServerIps(server)
-            if actualPubIp:
-                pubIp = actualPubIp
-
-            print(
-                "Created Instance: {}, {}, {}, {}VCPUs, {}G".format(
-                    server.id, privIp, pubIp, numCPU, gigaRAM
-                ),
-                flush=True,
-            )
-            results.append({"id": server.id, "ip": pubIp})
 
         print(
             "OpenStack batch create done: requested={}, started={}, active={}, failed={}".format(

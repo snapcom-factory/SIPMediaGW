@@ -3,18 +3,30 @@
     "auto_scale_threshold" : {
         "00:00:00": {"maxGw": 4, "unlockedMin":1, "loadMax":0.9},
         "07:00:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
-        "09:00:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
+        "09:00:00": {"maxGw": 4, "unlockedMin":3, "loadMax":0.75},
         "10:30:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
+        "11:05:00": {"maxGw": 10, "unlockedMin":10, "loadMax":0.75},
+        "11:10:00": {"maxGw": 4, "unlockedMin":1, "loadMax":0.75},
         "12:30:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.8},
+        "12:42:00": {"maxGw": 8, "unlockedMin":8, "loadMax":0.8},
+        "12:52:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
         "13:00:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
-        "14:30:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
-        "17:00:00": {"maxGw": 4, "unlockedMin":1, "loadMax":0.8}
+        "13:27:00": {"maxGw": 10, "unlockedMin":10, "loadMax":0.75},
+        "13:33:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
+        "13:39:00": {"maxGw": 4, "unlockedMin":0, "loadMax":0.75},
+        "16:16:00": {"maxGw": 10, "unlockedMin":10, "loadMax":0.75},
+        "16:48:00": {"maxGw": 4, "unlockedMin":2, "loadMax":0.75},
+        "16:51:00": {"maxGw": 10, "unlockedMin":10, "loadMax":0.75},
+        "17:00:00": {"maxGw": 4, "unlockedMin":1, "loadMax":0.8},
+        "17:02:00": {"maxGw": 10, "unlockedMin":6, "loadMax":0.8},
+        "17:15:00": {"maxGw": 10, "unlockedMin":1, "loadMax":0.8},
+        "17:16:00": {"maxGw": 10, "unlockedMin":10, "loadMax":0.75}
     },
     "cpu_per_gw": 4,
-    "ram_per_gw": 4,
+    "ram_per_gw": 8,
     "sip_db": {
-        "host": "127.0.0.1",
-        "root_password": "dbrootpw"
+        "host": "",
+        "root_password": ""
     },
     "redis": {
         "host": "127.0.0.1",
@@ -22,6 +34,7 @@
     },
     "cleaner_blacklist": [],
     "api_token": "1234",
-    "cleanup_threshold_seconds": 600
+    "cleanup_threshold_seconds": 600,
+    "create_timeout_seconds": 300
 }
 
