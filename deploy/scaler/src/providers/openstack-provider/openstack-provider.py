@@ -27,10 +27,6 @@ class OpenstackProvider(ManageInstance):
         # If `interface_1.pub` is set -> floating IP is allocated from this.
         self.interface1PubRef = None
         self.interface1PrivRef = None
-        # Optional second private NIC for admin traffic.
-        # Mapped to OpenStack Neutron network/subnet names from provider config.
-        self.adminNetwork = None
-        self.adminSubnet = None
         self.secuGrp = {}
         self.keyPair = None
         self.userData = ""
@@ -90,8 +86,6 @@ class OpenstackProvider(ManageInstance):
         # Accept either "priv"/"pub" keys or explicit names "priv_subnet"/"pub_subnet".
         self.interface1PrivRef = iface1.get("priv") or iface1.get("priv_subnet")
         self.interface1PubRef = iface1.get("pub") or iface1.get("pub_subnet")
-        self.adminNetwork = instConfig.get("admin_network")
-        self.adminSubnet = instConfig.get("admin_subnet")
         self.secuGrp = instConfig.get("security_group", {})
         self.keyPair = instConfig.get("key_pair")
         self.userData = ""
@@ -363,20 +357,6 @@ class OpenstackProvider(ManageInstance):
         if not nics:
             raise RuntimeError("No primary NIC could be built (check interface_1/ network/ subnet config)")
 
-        # Optional admin NIC.
-        if self.adminSubnet:
-            admin_subnet = self.conn.network.find_subnet(self.adminSubnet)
-            if admin_subnet:
-                nics.append({"net-id": admin_subnet.network_id, "v4-fixed-ip": None})
-            else:
-                raise RuntimeError("Admin subnet not found: {}".format(self.adminSubnet))
-        elif self.adminNetwork:
-            admin_net = self.conn.network.find_network(self.adminNetwork)
-            if admin_net:
-                nics.append({"uuid": admin_net.id})
-            else:
-                raise RuntimeError("Admin network not found: {}".format(self.adminNetwork))
-
         secGroups = []
         if isinstance(self.secuGrp, dict):
             for key in ["admin", "app"]:
@@ -490,20 +470,6 @@ class OpenstackProvider(ManageInstance):
         nics = self._buildPrimaryNic()
         if not nics:
             raise RuntimeError("No primary NIC could be built (check interface_1/ network/ subnet config)")
-
-        # Optional admin NIC.
-        if self.adminSubnet:
-            admin_subnet = self.conn.network.find_subnet(self.adminSubnet)
-            if admin_subnet:
-                nics.append({"net-id": admin_subnet.network_id, "v4-fixed-ip": None})
-            else:
-                raise RuntimeError("Admin subnet not found: {}".format(self.adminSubnet))
-        elif self.adminNetwork:
-            admin_net = self.conn.network.find_network(self.adminNetwork)
-            if admin_net:
-                nics.append({"uuid": admin_net.id})
-            else:
-                raise RuntimeError("Admin network not found: {}".format(self.adminNetwork))
 
         secGroups = []
         if isinstance(self.secuGrp, dict):
