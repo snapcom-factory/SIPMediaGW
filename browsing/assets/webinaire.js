@@ -40,18 +40,14 @@ class Webinaire extends UIHelper {
 
     async closeParticipantsPanelOnEnter() {
         if (this._participantsClosedOnEnter) return;
-    
         try {
-        // wait until the main UI is ready
-        const usersToggle = await this.waitForElement('[accesskey="U"]', { clickable: true }, 15000);
-    
-       
-        usersToggle.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-        this._participantsClosedOnEnter = true;
-    
-        console.log("[✓] Participants panel toggled (closed) on enter");
+            // wait until the main UI is ready
+            const usersToggle = await this.waitForElement('[accesskey="U"]', { clickable: true }, 15000);
+            usersToggle.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            this._participantsClosedOnEnter = true;
+            console.log("[✓] Participants panel toggled (closed) on enter");
         } catch (e) {
-        console.warn("[!] Could not close participants panel on enter:", e?.message || e);
+            console.warn("[!] Could not close participants panel on enter:", e?.message || e);
         }
     }
 
@@ -152,14 +148,11 @@ class Webinaire extends UIHelper {
                 }
             }
             await this.startVideo();
+            document.querySelector('[accesskey="M"]').click();
             await this.closeParticipantsPanelOnEnter();
-            
         } catch (error) {
             console.error('[✗] Join process failed:', error);
         } finally {
-            // `src/browsing.py` attends sur `window.meeting.joined` avant d'injecter le menu/DTMF.
-            // Comme `browsing/webinaire.py` ré-initialise parfois `window.meeting` et appelle seulement `browse()`,
-            // on marque prêt ici à la fin de la phase "browse".
             this.joined = true;
         }
     }

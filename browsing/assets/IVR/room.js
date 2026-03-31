@@ -6,7 +6,6 @@ export class Room {
         this.roomToken = null;
         this.mappedDomain = null;
         this.meeting = null;
-        this.mailOwner = null;
         this.overlayTimeouts = {};
     }
 
