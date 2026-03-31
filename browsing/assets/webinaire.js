@@ -127,10 +127,35 @@ class Webinaire extends UIHelper {
             closeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
             console.log('[✓] Modal closed');
 
+            // If the meeting is already recorded, Webinaire may require explicit acceptance.
+            // In that case, we let the caller (DTMF/menu) trigger the acceptance (see `interact()` key "6"),
+            // and only start video once the "Accept recording and continue" button is gone / not visible.
+            const acceptSelector = "[aria-label='Accept recording and continue']";
+            const acceptEl = document.querySelector(acceptSelector);
+            if (acceptEl) {
+                console.log('[INFO] Waiting for recording acceptance (someone should trigger it)...');
+                const timeoutMs = 120000; // safety timeout
+                const pollMs = 500;
+                const start = Date.now();
+                while (Date.now() - start < timeoutMs) {
+                    const el = document.querySelector(acceptSelector);
+                    if (!el) break;
+                    const style = window.getComputedStyle(el);
+                    const visible = style.display !== 'none' && style.visibility !== 'hidden' && el.offsetHeight > 0 && el.offsetWidth > 0;
+                    if (!visible) break;
+                    await new Promise(res => setTimeout(res, pollMs));
+                }
+            }
+
             await this.startVideo();
 
         } catch (error) {
             console.error('[✗] Join process failed:', error);
+        } finally {
+            // `src/browsing.py` attends sur `window.meeting.joined` avant d'injecter le menu/DTMF.
+            // Comme `browsing/webinaire.py` ré-initialise parfois `window.meeting` et appelle seulement `browse()`,
+            // on marque prêt ici à la fin de la phase "browse".
+            this.joined = true;
         }
     }
 

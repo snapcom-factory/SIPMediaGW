@@ -1,6 +1,5 @@
 class Menu {
     constructor(menu, lang) {
-        debugger;
         this.meeting = window.meeting;
         this.overlayTimeouts = {};
         this.img = {
@@ -249,7 +248,6 @@ class Menu {
             );
         } catch (err) {
             console.error("Error during Menu setup:", err);
-            onError(err);
         }
     }
 }
