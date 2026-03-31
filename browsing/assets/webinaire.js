@@ -134,16 +134,33 @@ class Webinaire extends UIHelper {
             const acceptSelector = "[aria-label='Accept recording and continue']";
             const acceptEl = document.querySelector(acceptSelector);
             if (acceptEl) {
-                console.log('[INFO] Waiting for recording acceptance (someone should trigger it)...');
-                const timeoutMs = 120000; // safety timeout
+                console.log('[INFO] Waiting for recording acceptance (human must click)...');
+                const timeoutMs = 60000; // 60s safety timeout so we never hang forever
                 const pollMs = 500;
                 const start = Date.now();
+                let lastLog = start;
                 while (Date.now() - start < timeoutMs) {
                     const el = document.querySelector(acceptSelector);
-                    if (!el) break;
+                    if (!el) {
+                        console.log('[✓] Accept button no longer in DOM, assuming accepted.');
+                        break;
+                    }
                     const style = window.getComputedStyle(el);
-                    const visible = style.display !== 'none' && style.visibility !== 'hidden' && el.offsetHeight > 0 && el.offsetWidth > 0;
-                    if (!visible) break;
+                    const visible =
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        el.offsetHeight > 0 &&
+                        el.offsetWidth > 0;
+                    const disabled = el.disabled || el.getAttribute('aria-disabled') === 'true';
+                    if (!visible || disabled) {
+                        console.log('[✓] Accept button no longer visible/enabled, assuming accepted.');
+                        break;
+                    }
+                    const now = Date.now();
+                    if (now - lastLog >= 5000) { // log every 5s for debugging
+                        console.log('[INFO] Still waiting for human recording acceptance...');
+                        lastLog = now;
+                    }
                     await new Promise(res => setTimeout(res, pollMs));
                 }
             }
