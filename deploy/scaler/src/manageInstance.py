@@ -23,6 +23,9 @@ class ManageInstance:
     def destroyInstances(self, ipList):
         pass
 
+    def close(self):
+        pass
+
 
 
 

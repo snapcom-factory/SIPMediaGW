@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import importlib
+import logging
 import sys
 import os
 import datetime as dt
@@ -9,6 +10,12 @@ import web
 import json
 from ScalerSIP  import ScalerSIP
 from ScalerMedia import ScalerMedia
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 
 scalerConfigFile = os.environ.get("SCALER_CONFIG_FILE", "scaler.json")
 cspName =  os.environ.get("CSP_NAME", "outscale")
@@ -73,6 +80,7 @@ class Scaling:
                     web.ctx.status = '200 OK'
                     return json.dumps({"status": "success", "message": "The scaler iteration succeed"})
             except Exception as error:
+                self.scaler.csp.close()
                 return "The scaler iteration failed: {}".format(error)
         if 'up' in data.keys():
             initData [scalerType.lower()] = {}
@@ -82,6 +90,7 @@ class Scaling:
                 web.ctx.status = '200 OK'
                 return json.dumps({"status": "success", "instance": instRes})
             except Exception as error:
+                self.scaler.csp.close()
                 web.ctx.status = '500 Internal Server Error'
                 return json.dumps({"Error": "Instance creation failed: {}".format(error)})
 

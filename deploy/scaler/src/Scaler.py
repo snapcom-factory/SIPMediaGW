@@ -59,7 +59,7 @@ class Scaler:
                 if inst in self.config['cleaner_blacklist']:
                     continue
                 runningCpuCount+= inst['cpu_count']
-                if not inst['addr']['pub']:
+                if not inst['addr']['pub'] and inst['addr']['priv']:
                     now = dt.datetime.now(dt.timezone.utc)
                     start = du.parse(inst['start'])
                     if (now-start).total_seconds() > 600:

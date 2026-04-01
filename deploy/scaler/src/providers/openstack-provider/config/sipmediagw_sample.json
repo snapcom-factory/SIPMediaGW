@@ -21,6 +21,5 @@
   "security_group": {
     "admin": "default",
     "app": "default"
-  },
-  "admin_subnet": ""
+  }
 }
