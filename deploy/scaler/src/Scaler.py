@@ -74,9 +74,29 @@ class Scaler:
     def getReadyToRunCapacity(self):
         pass
 
+    def _resolveThresholdTimeLine(self):
+        """Pick the right time-based schedule for today's day of the week."""
+        raw = self.config['auto_scale_threshold']
+
+        first_key = next(iter(raw))
+        if ':' in first_key and isinstance(raw[first_key], dict) and 'maxGw' in raw[first_key]:
+            return raw
+
+        today = dt.datetime.now().strftime("%A").lower()
+        for day_key, schedule in raw.items():
+            if day_key == "default":
+                continue
+            days = [d.strip().lower() for d in day_key.split(',')]
+            if today in days:
+                print("[SCALE] day={} matched key='{}'".format(today, day_key), flush=True)
+                return schedule
+
+        print("[SCALE] day={} using default schedule".format(today), flush=True)
+        return raw.get('default', raw)
+
     # Scaling logic based on current load and time of the day
     def scale(self, scaleTime=None, incallsNum=None):
-        thresholdTimeLine = self.config['auto_scale_threshold']
+        thresholdTimeLine = self._resolveThresholdTimeLine()
         if not scaleTime:
             scaleTime = dt.datetime.now().strftime("%H:%M:%S")
         th = min([ i for i in list(thresholdTimeLine.keys()) if i <= scaleTime],
