@@ -8,6 +8,8 @@ class Visio extends UIHelper{
         this.token = token;
         this.joined = false;
         this.passwordPrompt = JSON.parse(prompts)[lang]['password'];
+        this.isZeroPrefix = false;
+        this.zeroPrefixTimer = null;
     }
 
     async join() {
@@ -42,19 +44,106 @@ class Visio extends UIHelper{
         }
     }
 
+    sendCtrlShortcut(letter, useShift = false) {
+        const k = String(letter).toLowerCase();
+        const event = new KeyboardEvent('keydown', {
+            key: useShift ? k.toUpperCase() : k,
+            code: 'Key' + k.toUpperCase(),
+            ctrlKey: true,
+            shiftKey: useShift,
+            bubbles: true,
+            cancelable: true,
+            view: window
+        });
+        document.dispatchEvent(event);
+    }
+
+    clickIfExists(selector) {
+        const element = document.querySelector(selector);
+        if (element)
+            element.click();
+    }
+
+    sendReaction(selector) {
+        this.sendCtrlShortcut('e', true);
+        this.waitForElement(selector, { visible: true, clickable: true }, 2000)
+            .then((button) => {
+                button.click();
+                // Close reaction panel shortly after sending the reaction.
+                setTimeout(() => this.sendCtrlShortcut('e', true), 100);
+            })
+            .catch(() => {
+                this.sendCtrlShortcut('e', true);
+            });
+    }
+
     interact(key) {
-        if (key == "1")
-            document.querySelector('[aria-label*="Ctrl+d"]').click();
-        if (key == "2")
-            document.querySelector('[aria-label*="Ctrl+e"]').click();
-        if (key == "3" || key == "c")
-            document.querySelector('button[data-attr*="controls-chat-closed"], button[data-attr*="controls-chat-open"]').click();
-        if (key == "4")
-            document.querySelector('button[data-attr*="controls-hand-raise"], button[data-attr*="controls-hand-lower"]').click();
-        if (key == "5")
-            document.querySelector('button[data-attr*="controls-participants-closed"], button[data-attr*="controls-participants-open"]').click();
-        if (key == "s")
-            document.querySelector('[data-attr*="controls-screenshare"]').click();
+        const k = String(key).toLowerCase();
+        if (k === "0") {
+            this.isZeroPrefix = true;
+            clearTimeout(this.zeroPrefixTimer);
+            this.zeroPrefixTimer = setTimeout(() => {
+                this.isZeroPrefix = false;
+            }, 2000);
+            return;
+        }
+
+        if (this.isZeroPrefix) {
+            this.isZeroPrefix = false;
+            clearTimeout(this.zeroPrefixTimer);
+            switch (k) {
+                case "1":
+                    this.sendReaction('button[data-attr="send-reaction-thumbs-up"]');
+                    return;
+                case "2":
+                    this.sendReaction('button[data-attr="send-reaction-red-heart"]');
+                    return;
+                case "3":
+                    this.sendReaction('button[data-attr="send-reaction-clapping-hands"]');
+                    return;
+                case "4":
+                    this.sendReaction('button[data-attr="send-reaction-face-with-tears-of-joy"]');
+                    return;
+                default:
+                    // Unknown prefixed command: continue with normal handling.
+                    break;
+            }
+        }
+
+        switch (k) {
+            case "1":
+                this.sendCtrlShortcut('d');
+                this.clickIfExists('[aria-label*="Ctrl+d"]');
+                break;
+            case "2":
+                this.sendCtrlShortcut('e');
+                this.clickIfExists('[aria-label*="Ctrl+e"]');
+                break;
+            case "3":
+            case "c":
+                this.sendCtrlShortcut('m', true);
+                this.clickIfExists('button[data-attr*="controls-chat-closed"], button[data-attr*="controls-chat-open"]');
+                break;
+            case "4":
+                this.sendCtrlShortcut('h', true);
+                this.clickIfExists('button[data-attr*="controls-hand-raise"], button[data-attr*="controls-hand-lower"]');
+                break;
+            case "5":
+                this.sendCtrlShortcut('p', true);
+                this.clickIfExists('button[data-attr*="controls-participants-closed"], button[data-attr*="controls-participants-open"]');
+                break;
+            case "6":
+                this.sendCtrlShortcut('f', true);
+                break;
+            case "7":
+                this.sendCtrlShortcut('l', true);
+                break;
+            case "s":
+                this.clickIfExists('[data-attr*="controls-screenshare"]');
+                break;
+            default:
+                break;
+        }
     }
 
     async leave() {
