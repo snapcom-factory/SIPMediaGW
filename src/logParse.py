@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse, urlsplit
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -19,6 +20,37 @@ import requests
 ### Config ###
 
 postUrl = os.environ.get("LOG_PUSH_URL", "").strip()
+
+
+def isTemplateValue(value: str) -> bool:
+    return ("$" in value) or ("{" in value) or ("}" in value)
+
+
+def getMachineTimezone():
+    tzCandidates = [
+        (os.environ.get("LOG_TIMEZONE") or "").strip(),
+        (os.environ.get("TZ") or "").strip(),
+        (os.environ.get("HOST_TZ") or "").strip(),
+    ]
+
+    try:
+        with open("/etc/timezone", "r", encoding="utf-8") as tzFile:
+            tzCandidates.append(tzFile.read().strip())
+    except Exception:
+        pass
+
+    for tzName in tzCandidates:
+        if not tzName or isTemplateValue(tzName):
+            continue
+        try:
+            return ZoneInfo(tzName)
+        except Exception:
+            continue
+
+    return datetime.now().astimezone().tzinfo or timezone.utc
+
+
+machineTimezone = getMachineTimezone()
 
 ### Regex ###
 
@@ -46,15 +78,14 @@ fieldMap = {
 
 ### Time functions ###
 
-def utcNow() -> datetime:
-    return datetime.now(timezone.utc)
+def localNow() -> datetime:
+    return datetime.now(machineTimezone)
 
-def isoZ(dt: datetime, *, ms: bool = False) -> str:
-    s = dt.astimezone(timezone.utc).isoformat(timespec="milliseconds" if ms else "seconds")
-    return s.replace("+00:00", "Z")
+def isoLocal(dt: datetime, *, ms: bool = False) -> str:
+    return dt.astimezone(machineTimezone).isoformat(timespec="milliseconds" if ms else "seconds")
 
 def rawTimestamp(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%b %d %H:%M:%S")
+    return dt.astimezone(machineTimezone).strftime("%b %d %H:%M:%S")
 
 def parseIso(timestamp: str) -> Optional[datetime]:
     if not timestamp:
@@ -63,7 +94,9 @@ def parseIso(timestamp: str) -> Optional[datetime]:
         if timestamp.endswith("Z"):
             return datetime.fromisoformat(timestamp[:-1]).replace(tzinfo=timezone.utc)
         dt = datetime.fromisoformat(timestamp)
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        if dt.tzinfo:
+            return dt
+        return dt.replace(tzinfo=machineTimezone)
     except Exception:
         return None
 
@@ -279,8 +312,10 @@ def buildPayloadFromLines(lines: List[str], postUrl: str) -> Dict[str, Any]:
             continue
 
         if recordType == "call_start":
-            callStartRaw = callStartRaw or (recordData.get("raw") or "")
-            callStartTimestamp = callStartTimestamp or (recordData.get("timestamp") or "")
+            if recordData.get("raw"):
+                callStartRaw = recordData.get("raw") or ""
+            if recordData.get("timestamp"):
+                callStartTimestamp = recordData.get("timestamp") or ""
             if recordData.get("url"):
                 callUrl = recordData.get("url") or ""
 
@@ -494,7 +529,7 @@ def main() -> None:
             try:
                 ### Call start ###
                 if (not callStartLogged) and ("Web browsing URL:" in line):
-                    dt = utcNow()
+                    dt = localNow()
                     url = ""
                     if "URL:" in line:
                         url = line.split("URL:", 1)[1].strip()
@@ -502,7 +537,7 @@ def main() -> None:
                     appendHistory(
                         historyFile,
                         "call_start",
-                        {"raw": rawTimestamp(dt), "timestamp": isoZ(dt), "url": url},
+                        {"raw": rawTimestamp(dt), "timestamp": isoLocal(dt), "url": url},
                     )
                     callStartLogged = True
                     continue
@@ -517,11 +552,11 @@ def main() -> None:
                 if pref == "Event":
                     dtmfMatch = dtmfRegex.match(line.strip())
                     if dtmfMatch:
-                        dt = utcNow()
+                        dt = localNow()
                         appendHistory(
                             historyFile,
                             "dtmf",
-                            {"timestamp": isoZ(dt, ms=True), "input": dtmfMatch.group("input").strip()},
+                            {"timestamp": isoLocal(dt, ms=True), "input": dtmfMatch.group("input").strip()},
                         )
                         continue
 
@@ -555,8 +590,8 @@ def main() -> None:
                             },
                         )
 
-                        dt = utcNow()
-                        appendHistory(historyFile, "call_end", {"raw": rawTimestamp(dt), "timestamp": isoZ(dt)})
+                        dt = localNow()
+                        appendHistory(historyFile, "call_end", {"raw": rawTimestamp(dt), "timestamp": isoLocal(dt)})
 
                         pushHistory(historyFile)
                         continue
@@ -621,8 +656,8 @@ def main() -> None:
                         or "Files sent and removed" in line
                         or "Files moved in log directory" in line
                     ):
-                        dt = utcNow()
-                        appendHistory(historyFile, "call_end", {"raw": rawTimestamp(dt), "timestamp": isoZ(dt)})
+                        dt = localNow()
+                        appendHistory(historyFile, "call_end", {"raw": rawTimestamp(dt), "timestamp": isoLocal(dt)})
                         pushHistory(historyFile)
                         continue
 
@@ -632,3 +667,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
