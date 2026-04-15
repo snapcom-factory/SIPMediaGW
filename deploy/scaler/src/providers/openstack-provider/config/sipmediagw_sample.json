@@ -10,6 +10,7 @@
     }
   },
   "instance_image": "",
+  "delete_volumes_on_destroy": true,
   "interface_1": {
     "priv": "",
     "pub": ""

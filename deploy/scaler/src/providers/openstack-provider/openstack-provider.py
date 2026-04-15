@@ -37,6 +37,7 @@ class OpenstackProvider(ManageInstance):
         self.keyPair = None
         self.userData = ""
         self._flavorVcpuCache = {}
+        self.deleteVolumesOnDestroy = False
 
     def _connect(self, profileCfg):
         cfg = profileCfg if profileCfg else {}
@@ -106,8 +107,13 @@ class OpenstackProvider(ManageInstance):
         self.interface1PubRef = iface1.get("pub") or iface1.get("pub_subnet")
         self.secuGrp = instConfig.get("security_group", {})
         self.keyPair = instConfig.get("key_pair")
+        self.deleteVolumesOnDestroy = bool(instConfig.get("delete_volumes_on_destroy", False))
         self.userData = ""
         self._primarySubnetCidr = None
+        logger.info(
+            "Volume deletion on destroy is %s",
+            "ENABLED" if self.deleteVolumesOnDestroy else "DISABLED",
+        )
 
         self._resolvePrimarySubnetCidr()
 
@@ -651,11 +657,115 @@ class OpenstackProvider(ManageInstance):
         )
         return results
 
+    def _getServerVolumeIds(self, server):
+        """Return a list of volume IDs attached to the server."""
+        volumeIds = []
+        try:
+            attached = getattr(server, "attached_volumes", None) or []
+            for vol in attached:
+                volId = vol.get("id") if isinstance(vol, dict) else getattr(vol, "id", None)
+                if volId:
+                    volumeIds.append(volId)
+        except Exception as exc:
+            logger.warning(
+                "Cannot list attached volumes for server %s: %s",
+                getattr(server, "id", "?"), exc,
+            )
+        if not volumeIds:
+            try:
+                for attachment in self.conn.compute.volume_attachments(server):
+                    volId = getattr(attachment, "volume_id", None)
+                    if volId:
+                        volumeIds.append(volId)
+            except Exception as exc:
+                logger.warning(
+                    "Cannot list volume attachments for server %s: %s",
+                    getattr(server, "id", "?"), exc,
+                )
+        logger.debug("Server %s has volumes: %s", getattr(server, "id", "?"), volumeIds)
+        return volumeIds
+
+    def _deleteVolumes(self, volumeIds):
+        """Delete a list of volumes, waiting for them to become available."""
+        uniqueIds = list(dict.fromkeys(volumeIds))
+        if not uniqueIds:
+            logger.info("No attached volumes queued for deletion")
+            return
+
+        logger.info("Starting volume deletion for %s volume(s): %s", len(uniqueIds), uniqueIds)
+        remaining = list(uniqueIds)
+        deleted = []
+        alreadyGone = []
+        failed = []
+
+        maxAttempts = 6
+        for attempt in range(maxAttempts):
+            if not remaining:
+                break
+            if attempt > 0:
+                time.sleep(10)
+            logger.info(
+                "Volume deletion attempt %s/%s for %s pending volume(s)",
+                attempt + 1, maxAttempts, len(remaining),
+            )
+            stillPending = []
+            for volId in remaining:
+                try:
+                    vol = self.conn.block_storage.get_volume(volId)
+                    if not vol:
+                        logger.info("Volume %s already absent (treated as deleted)", volId)
+                        alreadyGone.append(volId)
+                        continue
+                    status = (getattr(vol, "status", "") or "").lower()
+                    if status == "in-use":
+                        logger.info(
+                            "Volume %s still in-use on attempt %s/%s, will retry",
+                            volId, attempt + 1, maxAttempts,
+                        )
+                        stillPending.append(volId)
+                        continue
+                    self.conn.block_storage.delete_volume(volId)
+                    logger.info("Delete request sent for volume %s (status=%s)", volId, status or "unknown")
+                    deleted.append(volId)
+                except Exception as exc:
+                    if attempt < (maxAttempts - 1):
+                        logger.warning(
+                            "Volume %s delete failed on attempt %s/%s, retrying: %s",
+                            volId, attempt + 1, maxAttempts, exc,
+                        )
+                        stillPending.append(volId)
+                    else:
+                        logger.error(
+                            "Volume %s delete failed after %s attempts: %s",
+                            volId, maxAttempts, exc,
+                        )
+                        failed.append(volId)
+            remaining = stillPending
+
+        if remaining:
+            for volId in remaining:
+                if volId not in failed:
+                    failed.append(volId)
+
+        logger.info(
+            "Volume deletion summary: requested=%s, deleted=%s, already_absent=%s, failed=%s",
+            len(uniqueIds), len(deleted), len(alreadyGone), len(failed),
+        )
+        if failed:
+            logger.warning("Volume deletion failed for IDs: %s", failed)
+
     def destroyInstances(self, ipList):
         if not self.conn:
             return
 
         serversByIp = self._buildServersByIpIndex()
+        pendingVolumeIds = []
+        logger.info(
+            "Destroy requested for %s IP(s); managed servers indexed=%s; volume deletion=%s",
+            len(ipList or []),
+            len(serversByIp),
+            "ENABLED" if self.deleteVolumesOnDestroy else "DISABLED",
+        )
 
         for ip in ipList:
             if not ip:
@@ -684,6 +794,14 @@ class OpenstackProvider(ManageInstance):
             else:
                 pubIp = ip
 
+            if self.deleteVolumesOnDestroy and server:
+                volumeIds = self._getServerVolumeIds(server)
+                pendingVolumeIds.extend(volumeIds)
+                logger.info(
+                    "Collected %s volume(s) for server %s before deletion: %s",
+                    len(volumeIds), instanceId, volumeIds,
+                )
+
             if server and pubIp:
                 try:
                     self.conn.compute.remove_floating_ip_from_server(server, pubIp)
@@ -705,3 +823,10 @@ class OpenstackProvider(ManageInstance):
                     logger.warning("Failed to release floating IP %s: %s", pubIp, exc)
 
             logger.info("Deleted Instance: %s, %s, %s", instanceId, privIp, pubIp)
+
+        if self.deleteVolumesOnDestroy and pendingVolumeIds:
+            self._deleteVolumes(pendingVolumeIds)
+        elif self.deleteVolumesOnDestroy:
+            logger.info("Volume deletion enabled but no attached volumes were collected")
+        else:
+            logger.info("Volume deletion skipped because delete_volumes_on_destroy is disabled")
