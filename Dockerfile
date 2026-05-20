@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git \
     && git clone --branch v3.15.0_patch https://github.com/Renater/re.git && cd re \
     && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && cmake --install build && cd .. \
-    && git clone --branch v3.15.0_patch https://github.com/Renater/baresip.git && cd baresip \
+    && git clone --branch v3.15.0_patchv2 https://github.com/Renater/baresip.git && cd baresip \
     && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && cmake --install build && cd .. \
     && rm -r baresip re \
     && apt-get remove --purge -y \
@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 #v=$(curl 'https://packages.debian.org/bookworm/amd64/chromium/download' | grep -o "chromium_.*.deb" | head -1 | cut -d "_" -f 2)
 #https://snapshot.debian.org/archive/debian/20240930T202925Z/pool/main/c/chromium/
-RUN v='146.0.7680.80-1~deb12u1' \
+RUN v='147.0.7727.137-1~deb12u1' \
    && url='http://security.debian.org/debian-security/pool/updates/main/c/chromium/' \
    && wget $url'chromium_'$v'_amd64.deb' \
    && wget $url'chromium-common_'$v'_amd64.deb' \

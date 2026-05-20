@@ -70,10 +70,10 @@ class Visio extends UIHelper{
             .then((button) => {
                 button.click();
                 // Close reaction panel shortly after sending the reaction.
-                setTimeout(() => this.sendCtrlShortcut('e', true), 100);
+                this.clickIfExists('button[data-attr*="reactions-toggle"]');
             })
             .catch(() => {
-                this.sendCtrlShortcut('e', true);
+                this.clickIfExists('button[data-attr*="reactions-toggle"]');
             });
     }
 
