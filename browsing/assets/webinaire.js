@@ -42,7 +42,7 @@ class Webinaire extends UIHelper {
         if (this._participantsClosedOnEnter) return;
         try {
             // wait until the main UI is ready
-            const usersToggle = await this.waitForElement('[accesskey="U"]', { clickable: true }, 15000);
+            const usersToggle = await this.waitForElement('[accesskey="U"]', { clickable: true }, 30000);
             usersToggle.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
             this._participantsClosedOnEnter = true;
             console.log("[✓] Participants panel toggled (closed) on enter");
@@ -130,12 +130,13 @@ class Webinaire extends UIHelper {
 
     async browse() {
         try {
+            await this.closeParticipantsPanelOnEnter();
             await this.startAudio();
-            const acceptSelector = "[aria-label='Accept recording and continue']";
+            const acceptSelector = `[aria-label="Accept recording and continue"], [aria-label="Accepter l'enregistrement et poursuivre"]`;
             const acceptEl = document.querySelector(acceptSelector);
             if (acceptEl) {
                 console.log('[INFO] Waiting for recording acceptance (human must click)...');
-                const timeoutMs = 60000; // 60s safety timeout so we never hang forever
+                const timeoutMs = 80000; // 60s safety timeout so we never hang forever
                 const pollMs = 500;
                 const start = Date.now();
                 let lastLog = start;
@@ -166,7 +167,7 @@ class Webinaire extends UIHelper {
             }
             await this.startVideo();
             document.querySelector('[accesskey="M"]').click();
-            await this.closeParticipantsPanelOnEnter();
+                        
         } catch (error) {
             console.error('[✗] Join process failed:', error);
         } finally {
@@ -191,7 +192,7 @@ class Webinaire extends UIHelper {
         if (key == "5")
             document.querySelector('[accesskey="U"]').click();
         if (key == "6")
-            document.querySelector('[aria-label="Accept recording and continue"]').click();
+            document.querySelector(`[aria-label="Accept recording and continue"], [aria-label="Accepter l'enregistrement et poursuivre"]`)?.click();
             if (document.querySelector("[data-test='joinAudio']")) {
                 this.startAudio();
             }
