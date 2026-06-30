@@ -139,8 +139,24 @@ class Visio extends UIHelper{
                 this.sendCtrlShortcut('l', true);
                 break;
             case "s":
-                this.clickIfExists('[data-attr*="controls-screenshare"]');
-                break;
+	    case "q":
+                document.querySelector('[data-attr*="controls-screenshare"]').click();
+
+        	const interval = setInterval(() => {
+            		const tile = document.querySelector('[data-lk-source="screen_share"]');
+            		if (!tile) return;
+
+            		const ignoreBtn = [...tile.querySelectorAll('button')]
+                          	.find(btn => /ignore/i.test(btn.textContent));
+
+            		if (ignoreBtn) {
+                		clearInterval(interval);
+                		ignoreBtn.click();
+            		}	
+        	}, 200);
+
+        	setTimeout(() => clearInterval(interval), 5000);                
+		break;
             default:
                 break;
         }
