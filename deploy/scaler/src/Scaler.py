@@ -102,73 +102,66 @@ class Scaler:
         th = min([ i for i in list(thresholdTimeLine.keys()) if i <= scaleTime],
                 key=lambda x:abs(getSeconds(x)-getSeconds(scaleTime)))
 
-        # Get current capacity and ready to run capacity
         currentCapacity = self.getCurrentCapacity()
-        readyToRunNum  = self.getReadyToRunCapacity()
+        readyToRunNum = self.getReadyToRunCapacity()
 
+        unlockedMin = thresholdTimeLine[th]['unlockedMin']
+        loadMax = thresholdTimeLine[th]['loadMax']
+        maxGw = thresholdTimeLine[th]['maxGw']
 
-        inCallNum = incallsNum if incallsNum else (currentCapacity - readyToRunNum )
-        minCapacity = thresholdTimeLine[th]['unlockedMin'] + inCallNum
+        inCallNum = incallsNum if incallsNum else (currentCapacity - readyToRunNum)
+        loadRatio = (inCallNum / currentCapacity) if currentCapacity > 0 else 0.0
+
         print(
-            "[SCALE] slot={} now={} current={} ready={} incall={} unlockedMin={} loadMax={} maxGw={}".format(
-                th,
-                scaleTime,
-                currentCapacity,
-                readyToRunNum,
-                inCallNum,
-                thresholdTimeLine[th]['unlockedMin'],
-                thresholdTimeLine[th]['loadMax'],
-                thresholdTimeLine[th]['maxGw'],
+            "[SCALE] slot={} now={} current={} ready={} incall={} load={:.0%} unlockedMin={} loadMax={} maxGw={}".format(
+                th, scaleTime, currentCapacity, readyToRunNum,
+                inCallNum, loadRatio, unlockedMin, loadMax, maxGw,
             ),
             flush=True,
         )
-        if readyToRunNum < thresholdTimeLine[th]['unlockedMin']:
-            targetCapacity = min((currentCapacity + thresholdTimeLine[th]['unlockedMin']
-                                  - readyToRunNum),
-                                  thresholdTimeLine[th]['maxGw'])
-            capacityIncrease = math.ceil(targetCapacity - currentCapacity)
+
+        # Phase 1: ensure base provisioned capacity (unlockedMin is a floor)
+        if currentCapacity < unlockedMin:
+            floorTarget = min(unlockedMin, maxGw)
+            capacityIncrease = math.ceil(floorTarget - currentCapacity)
             print(
-                "[SCALE] phase=unlock target={} delta={}gw".format(
-                    targetCapacity, capacityIncrease
+                "[SCALE] phase=floor target={} delta=+{}gw".format(
+                    floorTarget, capacityIncrease
                 ),
                 flush=True,
             )
             if capacityIncrease > 0:
-                print(
-                    "[UPSCALE] +{}gw ({} cpu) reason=unlock_min".format(
-                        capacityIncrease,
-                        math.ceil(capacityIncrease*self.config['cpu_per_gw'])
-                    ),
-                    flush=True,
-                )
                 self.upScale(capacityIncrease)
-                currentCapacity = currentCapacity + capacityIncrease
+                currentCapacity += capacityIncrease
 
-        targetCapacity = min(thresholdTimeLine[th]['maxGw'],
-                             max(minCapacity, inCallNum/thresholdTimeLine[th]['loadMax']))
-        capacityIncrease = math.ceil(targetCapacity - currentCapacity)
-        print(
-            "[SCALE] phase=load target={} delta={}gw".format(
-                targetCapacity, capacityIncrease
-            ),
-            flush=True,
-        )
-
-        if capacityIncrease > 0:
-            # Upscale
+        # Phase 2: scale up if load exceeds loadMax threshold
+        if currentCapacity > 0 and loadRatio > loadMax:
+            loadTarget = min(maxGw, math.ceil(inCallNum / loadMax))
+            capacityIncrease = math.ceil(loadTarget - currentCapacity)
             print(
-                "[UPSCALE] +{}gw ({} cpu) reason=load".format(
-                    capacityIncrease,
-                    math.ceil(capacityIncrease*self.config['cpu_per_gw'])
+                "[SCALE] phase=load target={} delta=+{}gw".format(
+                    loadTarget, capacityIncrease
                 ),
                 flush=True,
             )
-            self.upScale(capacityIncrease)
-        if capacityIncrease < 0:
-            # Downscale
+            if capacityIncrease > 0:
+                self.upScale(capacityIncrease)
+                currentCapacity += capacityIncrease
+
+        # Phase 3: scale down if over-provisioned (never below unlockedMin)
+        if inCallNum > 0:
+            sustainTarget = max(unlockedMin, math.ceil(inCallNum / loadMax))
+        else:
+            sustainTarget = unlockedMin
+        sustainTarget = min(sustainTarget, maxGw)
+        capacityDecrease = currentCapacity - sustainTarget
+        if capacityDecrease > 0:
             print(
-                "[DOWNSCALE] -{}gw reason=load".format(abs(capacityIncrease)),
+                "[SCALE] phase=downscale target={} delta=-{}gw".format(
+                    sustainTarget, capacityDecrease
+                ),
                 flush=True,
             )
-            self.downScale(abs(capacityIncrease))
+            self.downScale(capacityDecrease)
+
         return 0

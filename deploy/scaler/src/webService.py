@@ -24,6 +24,33 @@ cspProfile = os.environ.get("CSP_PROFILE", "visio-dev")
 
 scalerType = os.environ.get("SCALER_TYPE", "SIP")
 
+
+def _buildScaler():
+    # Build the CSP provider + Scaler exactly once for the lifetime of the
+    # process. Rebuilding them on every HTTP request was leaking ~3 sockets
+    # and ~3.6 MB per call (one CSP connection per request, never closed),
+    # which OOM-killed the process after ~12-18h of runtime.
+    sys.path.append("{}/providers/{}".format(os.path.dirname(os.path.abspath(__file__)), cspName))
+    modName = cspName
+    print("CSP mod name: "+modName, flush=True)
+    mod = importlib.import_module(modName)
+    isClassMember = lambda member: inspect.isclass(member) and member.__module__ == modName
+    cspObj = inspect.getmembers(mod, isClassMember)[0][1]
+
+    csp = cspObj(cspProfile)
+
+    if scalerType.upper() == "SIP":
+        scaler = ScalerSIP(csp)
+    else:
+        scaler = ScalerMedia(csp)
+
+    scaler.configure("config/{}".format(scalerConfigFile))
+    return scaler
+
+
+_scaler = _buildScaler()
+
+
 def authorize(func):
     def inner(*args, **kwargs):
         try:
@@ -48,24 +75,7 @@ def authorize(func):
 
 class Scaling:
     def __init__(self) -> None:
-        # Get a manageInstance object from CSP file name
-        sys.path.append("{}/providers/{}".format(os.path.dirname(os.path.abspath(__file__)), cspName))
-        modName = cspName
-        print("CSP mod name: "+modName, flush=True)
-        mod = importlib.import_module(modName)
-        isClassMember = lambda member: inspect.isclass(member) and member.__module__ == modName
-        cspObj = inspect.getmembers(mod, isClassMember)[0][1]
-
-        csp = cspObj(cspProfile)
-        #initData = {}
-        #csp.configureInstance("{}/config/{}".format(cspName, cspConfigFile), initData)
-        
-        if scalerType.upper() == "SIP":
-            self.scaler = ScalerSIP(csp)
-        else:
-            self.scaler = ScalerMedia(csp)
-
-        self.scaler.configure("config/{}".format(scalerConfigFile))
+        self.scaler = _scaler
 
     @authorize
     def GET(self, args=None):
@@ -80,7 +90,6 @@ class Scaling:
                     web.ctx.status = '200 OK'
                     return json.dumps({"status": "success", "message": "The scaler iteration succeed"})
             except Exception as error:
-                self.scaler.csp.close()
                 return "The scaler iteration failed: {}".format(error)
         if 'up' in data.keys():
             initData [scalerType.lower()] = {}
@@ -90,7 +99,6 @@ class Scaling:
                 web.ctx.status = '200 OK'
                 return json.dumps({"status": "success", "instance": instRes})
             except Exception as error:
-                self.scaler.csp.close()
                 web.ctx.status = '500 Internal Server Error'
                 return json.dumps({"Error": "Instance creation failed: {}".format(error)})
 
