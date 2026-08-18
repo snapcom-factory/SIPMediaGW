@@ -25,6 +25,10 @@ cspProfile = os.environ.get("CSP_PROFILE", "visio-dev")
 scalerType = os.environ.get("SCALER_TYPE", "SIP")
 
 
+def _scalerConfigPath():
+    return "config/{}".format(scalerConfigFile)
+
+
 def _buildScaler():
     # Build the CSP provider + Scaler exactly once for the lifetime of the
     # process. Rebuilding them on every HTTP request was leaking ~3 sockets
@@ -44,7 +48,7 @@ def _buildScaler():
     else:
         scaler = ScalerMedia(csp)
 
-    scaler.configure("config/{}".format(scalerConfigFile))
+    scaler.configure(_scalerConfigPath())
     return scaler
 
 
@@ -77,8 +81,20 @@ class Scaling:
     def __init__(self) -> None:
         self.scaler = _scaler
 
+    def _reloadScalerConfig(self):
+        if scalerType.upper() != "SIP":
+            return
+        try:
+            self.scaler.configure(_scalerConfigPath())
+        except Exception as exc:
+            print(
+                "Failed to reload scaler config, keeping previous: {}".format(exc),
+                flush=True,
+            )
+
     @authorize
     def GET(self, args=None):
+        self._reloadScalerConfig()
         data = web.input()
         if 'auto' in data.keys():
             initData = { scalerType.lower() : {}}
