@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 _MAX_PARALLEL_WORKERS = 10
 
 
+def _isNotFoundError(exc):
+    status = getattr(exc, "status_code", None) or getattr(exc, "http_status", None)
+    if status == 404:
+        return True
+    if "notfound" in type(exc).__name__.lower():
+        return True
+    return "not found" in str(exc).lower()
+
+
 class OpenstackProvider(ManageInstance):
 
     def __init__(self, profile):
@@ -711,7 +720,7 @@ class OpenstackProvider(ManageInstance):
             stillPending = []
             for volId in remaining:
                 try:
-                    vol = self.conn.block_storage.get_volume(volId)
+                    vol = self.conn.block_storage.find_volume(volId, ignore_missing=True)
                     if not vol:
                         logger.info("Volume %s already absent (treated as deleted)", volId)
                         alreadyGone.append(volId)
@@ -724,10 +733,14 @@ class OpenstackProvider(ManageInstance):
                         )
                         stillPending.append(volId)
                         continue
-                    self.conn.block_storage.delete_volume(volId)
+                    self.conn.block_storage.delete_volume(volId, ignore_missing=True)
                     logger.info("Delete request sent for volume %s (status=%s)", volId, status or "unknown")
                     deleted.append(volId)
                 except Exception as exc:
+                    if _isNotFoundError(exc):
+                        logger.info("Volume %s already absent (treated as deleted)", volId)
+                        alreadyGone.append(volId)
+                        continue
                     if attempt < (maxAttempts - 1):
                         logger.warning(
                             "Volume %s delete failed on attempt %s/%s, retrying: %s",
@@ -748,7 +761,7 @@ class OpenstackProvider(ManageInstance):
                     failed.append(volId)
 
         logger.info(
-            "Volume deletion summary: requested=%s, deleted=%s, already_absent=%s, failed=%s",
+            "Volume deletion summary: requested=%s, deleted=%s, already_deleted=%s, failed=%s",
             len(uniqueIds), len(deleted), len(alreadyGone), len(failed),
         )
         if failed:
