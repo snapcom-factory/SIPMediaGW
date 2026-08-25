@@ -398,11 +398,13 @@ then as network.
 All three must hold:
 
 1. status is `ACTIVE` or `BUILD` (`BUILD` counts as capacity already ordered);
-2. name starts with the configured `name` prefix;
+2. name starts with `<provider name>.<gw_name_prefix>` (e.g. `GW.mediagw`), not
+   only the provider `name` — otherwise unrelated VMs such as `GW.other` would be
+   managed too;
 3. carries `security_group.app` when that group is configured.
 
-If the prefix is unset, **no** server is treated as managed (fail closed). The
-same prefix rule applies when resolving an IP before destroy.
+If either part of the prefix is unset, **no** server is treated as managed (fail
+closed). The same prefix rule applies when resolving an IP before destroy.
 
 Private address: by CIDR when the primary subnet is known, else by network name.
 First match wins (Nova address order is not stable).

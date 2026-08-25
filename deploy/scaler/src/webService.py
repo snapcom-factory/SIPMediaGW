@@ -134,7 +134,12 @@ class Scaling:
 
     def _configureCsp(self):
         """Reload the provider config and return the fresh per-action init data."""
-        initData = {scalerType.lower(): {}}
+        initData = {
+            scalerType.lower(): {},
+            # OpenStack (and any provider that scopes by name) uses this to own
+            # only "<provider name>.<gw_name_prefix>..." servers.
+            "gw_name_prefix": self.scaler.config.get("gw_name_prefix"),
+        }
         self.scaler.csp.configureInstance(_cspConfigPath(), initData)
         return initData
 
@@ -160,7 +165,9 @@ class Scaling:
         if 'up' in data.keys():
             self._configureCsp()
             try:
-                instRes = self.scaler.csp.createInstance('4', '4', name='mediagw')
+                instRes = self.scaler.csp.createInstance(
+                    '4', '4', name=self.scaler.config.get('gw_name_prefix')
+                )
                 web.ctx.status = '200 OK'
                 return json.dumps({"status": "success", "instance": instRes})
             except Exception as error:

@@ -35,6 +35,7 @@ class OpenstackProvider(ManageInstance):
         self.profile = profile
         self.conn = None
         self.instName = None
+        self.gwNamePrefix = None
         self._warnedMissingInstName = False
         self.instType = {}
         self.ami = None
@@ -136,6 +137,16 @@ class OpenstackProvider(ManageInstance):
 
         self.instName = name.strip()
         self._warnedMissingInstName = False
+        # Narrow ownership to "<name>.<gw_name_prefix>..." (e.g. GW.mediagw-0),
+        # not every server that merely starts with "GW".
+        rawGwPrefix = initData.get("gw_name_prefix") if isinstance(initData, dict) else None
+        if isinstance(rawGwPrefix, str) and rawGwPrefix.strip():
+            self.gwNamePrefix = rawGwPrefix.strip()
+        else:
+            self.gwNamePrefix = None
+            logger.warning(
+                "gw_name_prefix missing from initData; no server will be treated as managed"
+            )
         self.instType = instConfig["instance_type_by_cpu_num"]
         self.ami = image.strip()
         self.network = instConfig.get("network")
@@ -176,6 +187,8 @@ class OpenstackProvider(ManageInstance):
                 )
 
         for act in initData:
+            if not isinstance(initData.get(act), dict):
+                continue
             actionScript = scriptCfg.get(act, [])
             if not actionScript:
                 continue
@@ -310,22 +323,37 @@ class OpenstackProvider(ManageInstance):
             start = start.replace(tzinfo=dt.timezone.utc)
         return (dt.datetime.now(dt.timezone.utc) - start).total_seconds()
 
+    def _managedNamePrefix(self):
+        """
+        Full name prefix of servers this scaler owns: "<instName>.<gwNamePrefix>".
+
+        Creations are named "{instName}.{gwNamePrefix}-{index}", so ownership must
+        require both parts. Matching on instName alone would also catch unrelated
+        VMs such as "GW.other".
+        """
+        if not self.instName or not self.gwNamePrefix:
+            return None
+        return "{}.{}".format(self.instName, self.gwNamePrefix)
+
     def _isManagedServer(self, server):
         """
         Return True if the server was created by this scaler (name prefix match).
 
-        Fail closed when the prefix is unknown: matching every server in the
-        project would let cleanup or destroy touch unrelated VMs.
+        Fail closed when the composed prefix is unknown: matching every server in
+        the project would let cleanup or destroy touch unrelated VMs.
         """
-        if not self.instName:
+        managedPrefix = self._managedNamePrefix()
+        if not managedPrefix:
             if not getattr(self, "_warnedMissingInstName", False):
                 logger.warning(
-                    "Instance name prefix is unset; treating no server as managed"
+                    "Managed name prefix unset (name=%r gw_name_prefix=%r); "
+                    "treating no server as managed",
+                    self.instName, self.gwNamePrefix,
                 )
                 self._warnedMissingInstName = True
             return False
         serverName = getattr(server, "name", None) or ""
-        return serverName.startswith(self.instName)
+        return serverName.startswith(managedPrefix)
 
     def enumerateInstances(self):
         if not self.conn:
