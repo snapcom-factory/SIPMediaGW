@@ -119,7 +119,7 @@ services:
     container_name: scaler
     volumes:
       - ./scaler/config:/var/config
-      - ./scaler/src/providers/openstack-provider/:/var/providers/openstack-provider
+      - ./scaler/src/providers/openstackProvider/:/var/providers/openstackProvider
       - ./scaler/src/Scaler.py:/var/Scaler.py
     logging:
       driver: syslog
@@ -128,7 +128,7 @@ services:
     environment:
       TZ: "Europe/Paris" # Time Zone
       SCALER_CONFIG_FILE: "scaler.json"
-      CSP_NAME: "openstack-provider"
+      CSP_NAME: "openstackProvider"
       CSP_CONFIG_FILE: "sipmediagw_sample.json"
       CSP_PROFILE: "ovh_uk"
       SCALER_TYPE: "SIP" # SIP or MEDIA

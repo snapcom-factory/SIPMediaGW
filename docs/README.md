@@ -63,15 +63,15 @@ This file serves as a navigational guide for all the documentation available in 
 
 ### Auto-scaling
 
-📄 [scaler_logic.md](https://github.com/Renater/SIPMediaGW/blob/main/docs/scaler_logic.md)  
-**Description**: SIPMediaGW auto-scaling mechanisms.
+📄 [scaler.md](https://github.com/Renater/SIPMediaGW/blob/main/deploy/scaler/scaler.md)  
+**Description**: SIPMediaGW auto-scaling (config, decision logic, HTTP API, OpenStack provider).
 
 ---
 
 ### API Documentation
 
 📄 [sipmediagw_API.md](https://github.com/Renater/SIPMediaGW/blob/main/docs/sipmediagw_API.md)  
-📄 [scaler_API.md](https://github.com/Renater/SIPMediaGW/blob/main/docs/scaler_API.md)  
+📄 [scaler.md](https://github.com/Renater/SIPMediaGW/blob/main/deploy/scaler/scaler.md#http-api) (scaler HTTP API section)  
 **Description**: API references for managing gateways and scaling instances.
 
 ---

@@ -1,52 +1,77 @@
 #!/usr/bin/env python
-import math
+import logging
 import datetime as dt
 import dateutil.parser as du
-import json
 import redis
 
-from contextlib import closing
 from Scaler import Scaler
 
-def getSeconds(stringHMS):
-   timedeltaObj = dt.datetime.strptime(stringHMS, "%H:%M:%S") - dt.datetime(1900,1,1)
-   return timedeltaObj.total_seconds()
+logger = logging.getLogger(__name__)
 
-# Media Scaler class using Redis to track room assignments and gateway states
+# Each "gateway:*" Redis entry is a pipe-separated record laid out as below.
+GATEWAY_IP = 0
+GATEWAY_STATE = 1
+GATEWAY_UPDATED_AT = 4
+GATEWAY_FIELDS = 5
 
 
+def _parseUpdatedAt(value):
+    """
+    Parse a gateway timestamp into a UTC-aware datetime, or None when unusable.
 
+    Entries written before timestamps became timezone-aware carry local time, so
+    a naive value is interpreted as local rather than as UTC.
+    """
+    try:
+        parsed = du.parse(value)
+    except (ValueError, OverflowError, TypeError) as exc:
+        logger.warning("Ignoring unparsable gateway timestamp '%s': %s", value, exc)
+        return None
+    return parsed.astimezone(dt.timezone.utc)
+
+
+# Media scaler using Redis to track room assignments and gateway states.
 class ScalerMedia(Scaler):
-
-    def __init__(self, cspObj):
-        super().__init__(cspObj)
 
     def configure(self, configFile):
         super().configure(configFile)
         self.redisClient = redis.Redis(host=self.config["redis"]["host"], port=self.config["redis"]["port"], decode_responses=True)
 
+    def _gatewayParts(self, key):
+        """
+        Read a gateway entry and return its fields, padded to GATEWAY_FIELDS.
+
+        Returns None when the key disappeared between the scan and the read,
+        which happens routinely since both are separate Redis round-trips.
+        """
+        value = self.redisClient.get(key)
+        if value is None:
+            return None
+        parts = value.split("|")
+        if len(parts) < GATEWAY_FIELDS:
+            parts += [""] * (GATEWAY_FIELDS - len(parts))
+        return parts
+
     # Downscale function
     def downScale(self, numGW):
         ipList = []
         for key in self.redisClient.scan_iter(match="gateway:*"):
-          if numGW <= 0:
-              break
-          value = self.redisClient.get(key)
-          parts = value.split("|")
-          gwIp = parts[0]
-          state = parts[1] if len(parts) > 1 else None
-          if state in ["started", "stopped"]:
+            if numGW <= 0:
+                break
+            parts = self._gatewayParts(key)
+            if parts is None:
+                continue
+            gwIp = parts[GATEWAY_IP]
+            if parts[GATEWAY_STATE] in ["started", "stopped"]:
                 # No rooms assigned, can downscale
                 ipList.append(gwIp)
-                # Update gateway state to stopping
-                parts[1] = "stopping"
-                #update last status_update_time
-                parts[4] = dt.datetime.now().isoformat()
+                parts[GATEWAY_STATE] = "stopping"
+                parts[GATEWAY_UPDATED_AT] = dt.datetime.now(dt.timezone.utc).isoformat()
 
                 self.redisClient.set(key, "|".join(parts))
                 numGW -= 1
         if ipList:
-            print(f"Downscaling gateways: {ipList}", flush=True)
+            logger.info("Downscaling gateways: %s", ipList)
             self.csp.destroyInstances(ipList)
 
     # Cleanup stale instances
@@ -56,36 +81,45 @@ class ScalerMedia(Scaler):
         now = dt.datetime.now(dt.timezone.utc)
         ipList = []
         for key in self.redisClient.scan_iter(match="gateway:*"):
-            value = self.redisClient.get(key)
-            parts = value.split("|")
-            gwIp = parts[0]
-            state = parts[1] if len(parts) > 1 else None
-            lastUpdateStr = parts[4] if len(parts) > 4 else None
+            parts = self._gatewayParts(key)
+            if parts is None:
+                continue
+            gwIp = parts[GATEWAY_IP]
+            state = parts[GATEWAY_STATE]
+            lastUpdateStr = parts[GATEWAY_UPDATED_AT]
             if state == "stopping" and lastUpdateStr:
-                lastUpdate = du.parse(lastUpdateStr)
+                lastUpdate = _parseUpdatedAt(lastUpdateStr)
+                if lastUpdate is None:
+                    continue
                 if (now - lastUpdate).total_seconds() > thresholdSeconds:
                     ipList.append(gwIp)
         if ipList:
-            print(f"Cleaning up stale gateways: {ipList}", flush=True)
+            logger.info("Cleaning up stale gateways: %s", ipList)
             self.csp.destroyInstances(ipList)
-        
+
         super().cleanup()
 
     # Get current available capacity
     def getCurrentCapacity(self):
-        #Get number of available gateways from Redis
         registeredGateways = 0
         for _ in self.redisClient.scan_iter(match="gateway:*"):
-                registeredGateways += 1
+            registeredGateways += 1
         return registeredGateways
+
+    def getPendingCapacity(self):
+        """Gateways created at the provider that have not announced themselves yet."""
+        knownIps = set()
+        for key in self.redisClient.scan_iter(match="gateway:*"):
+            parts = self._gatewayParts(key)
+            if parts is not None and parts[GATEWAY_IP]:
+                knownIps.add(parts[GATEWAY_IP])
+        return self._countPendingInstances(knownIps)
 
     # Get Ready to run capacity
     def getReadyToRunCapacity(self):
-        #Get number of available gateways from Redis
         readyToRun = 0
         for key in self.redisClient.scan_iter(match="gateway:*"):
-            value = self.redisClient.get(key)
-            parts = value.split("|")
-            if len(parts) > 1 and parts[1] == "started":
+            parts = self._gatewayParts(key)
+            if parts is not None and parts[GATEWAY_STATE] == "started":
                 readyToRun += 1
         return readyToRun

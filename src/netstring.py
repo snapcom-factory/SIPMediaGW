@@ -73,25 +73,44 @@ class Netstring:
         self._sock.sendall(bytes(data,encoding="utf-8"))
 
 
-    def getEvents(self, callBack, args, timeOut=None):
-        try:
-            # Create a socket (SOCK_STREAM means a TCP socket)
-            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # Connect to server and send data
-            self._sock.connect((self.host, self.port))
-            self._sock.settimeout(timeOut)
-            while True:
-                status = self.decodeNetString(self.__getStatus())
-                if not status:
-                    break
-                if "event" in status:
-                    cmd = callBack(status, args)
-                    if cmd:
-                        self.__sendCommand(cmd)
-        except:
-            print("Get events loop abnormally stopped", file=sys.stdout, flush=True)
-            print(traceback.format_exc(), file=sys.stdout, flush=True)
-        finally:
-            self._sock.close()
+    def getEvents(self, callBack, args, timeOut=None, maxReconnect=10, reconnectDelay=3):
+        reconnectAttempts = 0
+        quitRequested = False
+        while reconnectAttempts <= maxReconnect:
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._sock.connect((self.host, self.port))
+                self._sock.settimeout(timeOut)
+                reconnectAttempts = 0
+                while True:
+                    status = self.decodeNetString(self.__getStatus())
+                    if not status:
+                        break
+                    if "event" in status:
+                        cmd = callBack(status, args)
+                        if cmd:
+                            if cmd.get("command") == "quit":
+                                quitRequested = True
+                            self.__sendCommand(cmd)
+            except Exception:
+                print("Get events loop abnormally stopped", file=sys.stdout, flush=True)
+                print(traceback.format_exc(), file=sys.stdout, flush=True)
+            finally:
+                try:
+                    self._sock.close()
+                except Exception:
+                    pass
+
+            if quitRequested:
+                break
+
+            reconnectAttempts += 1
+            if reconnectAttempts <= maxReconnect:
+                print(f"Connection lost, reconnecting in {reconnectDelay}s (attempt {reconnectAttempts}/{maxReconnect})...",
+                      file=sys.stdout, flush=True)
+                time.sleep(reconnectDelay)
+            else:
+                print(f"Max reconnection attempts ({maxReconnect}) reached, giving up.",
+                      file=sys.stdout, flush=True)
 
 
