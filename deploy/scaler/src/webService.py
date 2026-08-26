@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 scalerConfigFile = os.environ.get("SCALER_CONFIG_FILE", "scaler.json")
 cspName =  os.environ.get("CSP_NAME", "outscale")
-cspConfigFile = os.environ.get("CSP_CONFIG_FILE", "sipmediagw_sample.json")
+cspConfigFile = os.environ.get("CSP_CONFIG_FILE", "sipmediagw.json")
 cspProfile = os.environ.get("CSP_PROFILE", "visio-dev")
 
 scalerType = os.environ.get("SCALER_TYPE", "SIP")

@@ -129,7 +129,7 @@ services:
       TZ: "Europe/Paris" # Time Zone
       SCALER_CONFIG_FILE: "scaler.json"
       CSP_NAME: "openstackProvider"
-      CSP_CONFIG_FILE: "sipmediagw_sample.json"
+      CSP_CONFIG_FILE: "sipmediagw.json"
       CSP_PROFILE: "ovh_uk"
       SCALER_TYPE: "SIP" # SIP or MEDIA
     entrypoint:

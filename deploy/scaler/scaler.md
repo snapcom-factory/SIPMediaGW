@@ -43,7 +43,8 @@ deploy/scaler/
 ├── Dockerfile
 ├── scaler.md                    # this document (canonical)
 ├── config/
-│   └── scaler.json              # thresholds, DB access, API token
+│   ├── scaler.json.example      # committed template (secrets empty)
+│   └── scaler.json              # local copy (gitignored): thresholds, DB, API token
 └── src/
     ├── webService.py            # entry point: HTTP endpoint + provider loading
     ├── scale.sh                 # calls the endpoint every 60s
@@ -53,9 +54,22 @@ deploy/scaler/
     ├── manageInstance.py        # ManageInstance, the cloud provider interface
     └── providers/
         ├── openstackProvider/   # OpenStack implementation
+        │   └── config/
+        │       ├── sipmediagw.json.example # committed template (credentials empty)
+        │       └── sipmediagw.json         # local copy (gitignored)
         ├── outscale/            # legacy Outscale implementation
         └── fakescale/           # unused, does not import
 ```
+
+Copy the templates before the first run:
+
+```bash
+cp deploy/scaler/config/scaler.json.example deploy/scaler/config/scaler.json
+cp deploy/scaler/src/providers/openstackProvider/config/sipmediagw.json.example \
+   deploy/scaler/src/providers/openstackProvider/config/sipmediagw.json
+# then fill in api_token, sip_db.root_password, and OpenStack credentials
+```
+
 
 ---
 
@@ -70,9 +84,9 @@ Behaviour is driven by environment variables set in `deploy/docker-compose.yml`:
 | Variable | Default | Meaning |
 |---|---|---|
 | `SCALER_TYPE` | `SIP` | `SIP` or `MEDIA` |
-| `SCALER_CONFIG_FILE` | `scaler.json` | file loaded from `config/` |
+| `SCALER_CONFIG_FILE` | `scaler.json` | file loaded from `config/` (local; see `scaler.json.example`) |
 | `CSP_NAME` | `outscale` | provider package under `src/providers/` |
-| `CSP_CONFIG_FILE` | `sipmediagw_sample.json` | file loaded from the provider's `config/` |
+| `CSP_CONFIG_FILE` | `sipmediagw.json` | file loaded from the provider's `config/` (local; see `sipmediagw.json.example`) |
 | `CSP_PROFILE` | `visio-dev` | profile selected inside that provider config |
 
 The provider is loaded by name at startup: the module `CSP_NAME` is imported and
@@ -474,9 +488,10 @@ forwarded to syslog under the `scaler` tag.
 
 ## Known limitations
 
-- Secrets (`api_token`, `sip_db.root_password`, provider credentials) live in
-  config files; `scale.sh` also hard-codes the bearer token. Prefer environment
-  variables and rotate committed values.
+- Secrets (`api_token`, `sip_db.root_password`, provider credentials) belong in
+  local gitignored files (`config/scaler.json`, provider `sipmediagw.json`),
+  copied from the committed templates. `scale.sh` still hard-codes the bearer
+  token today; prefer aligning it with `api_token` / an env var.
 - SIP SQL builds some `NOT EXISTS` clauses by string concatenation (no user input,
   but hard to read).
 - `providers/fakescale` is dead (broken import; does not satisfy the interface).

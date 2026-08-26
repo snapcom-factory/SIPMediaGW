@@ -1,6 +1,6 @@
 {
   "name": "GW",
-  "key_pair": "", 
+  "key_pair": "",
   "profile": {
     "ovh_uk": {
       "auth_url": "",
