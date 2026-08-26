@@ -21,6 +21,7 @@ services:
       TZ: "Europe/Paris"
     volumes:
       - ./kamailio/config/kamailio.cfg:/etc/kamailio/kamailio.cfg
+      - ./kamailio/config/tls:/etc/kamailio/tls
     depends_on:
       sip_db:
         condition: service_healthy

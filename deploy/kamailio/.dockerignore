@@ -1,0 +1,3 @@
+# Keep local secrets out of the image; Compose bind-mounts them at runtime.
+config/kamailio.cfg
+config/tls/*.pem

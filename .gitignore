@@ -5,3 +5,7 @@ logs/
 # Local scaler secrets / cloud credentials (keep *.json.example committed)
 deploy/scaler/config/scaler.json
 deploy/scaler/src/providers/openstackProvider/config/sipmediagw.json
+
+# Local Kamailio config and TLS material (keep *.example committed)
+deploy/kamailio/config/kamailio.cfg
+deploy/kamailio/config/tls/*.pem
