@@ -18,6 +18,12 @@ _SQL_REGISTERED_VMS = '''SELECT DISTINCT
 
 class ScalerSIP(Scaler):
 
+    def __init__(self, cspObj):
+        super().__init__(cspObj)
+        # Consecutive would_delete=yes sightings per IP, reset when the VM
+        # reappears in Kamailio or is no longer stale.
+        self._orphanSightings = {}
+
     def _connect(self):
         """Open a connection to the Kamailio database, to be used as a context manager."""
         return closing(mysqlcon.connect(host=self.config['sip_db']['host'],
@@ -121,14 +127,17 @@ class ScalerSIP(Scaler):
 
     def _reapOrphanInstances(self, registeredIps):
         """
-        Destroy managed instances that Kamailio has never registered, once they
-        are older than cleanup_threshold_seconds.
+        Destroy managed instances that Kamailio has not registered, once they
+        are older than cleanup_threshold_seconds *and* have been seen in that
+        state for orphan_confirmations consecutive iterations.
 
+        A gateway that drops out of Kamailio for a single sync (end of a call
+        racing the location refresh) is therefore not destroyed on first sight.
         Nothing is deleted when Kamailio reports no gateway at all: an empty
-        location table would otherwise make the whole fleet look orphaned, for
-        instance while the registrar is restarting.
+        location table would otherwise make the whole fleet look orphaned.
         """
         threshold = int(self.config.get('cleanup_threshold_seconds', 600))
+        confirmations = max(1, int(self.config.get('orphan_confirmations', 3)))
         blacklist = set(self.config.get('cleaner_blacklist') or [])
         now = dt.datetime.now(dt.timezone.utc)
         instList = self._enumerateInstances()
@@ -145,32 +154,50 @@ class ScalerSIP(Scaler):
             wouldDelete = age is not None and age > threshold
             orphans.append((priv, pub, age, wouldDelete))
 
+        stillStale = set()
+        if registeredIps:
+            for priv, pub, _, wouldDelete in orphans:
+                ip = priv or pub
+                if not ip or not wouldDelete:
+                    continue
+                stillStale.add(ip)
+                self._orphanSightings[ip] = self._orphanSightings.get(ip, 0) + 1
+        else:
+            logger.warning(
+                "[ORPHAN] Kamailio reports no registered gateway, skipping deletion"
+            )
+
+        for ip in list(self._orphanSightings):
+            if ip not in stillStale:
+                self._orphanSightings.pop(ip, None)
+
         logger.info(
-            "[ORPHAN] csp=%s kamailio=%s candidates=%s",
-            len(instList), len(registeredIps), len(orphans),
+            "[ORPHAN] csp=%s kamailio=%s candidates=%s confirmations=%s",
+            len(instList), len(registeredIps), len(orphans), confirmations,
         )
         for priv, pub, age, wouldDelete in orphans:
+            ip = priv or pub
+            sightings = self._orphanSightings.get(ip, 0) if ip else 0
             logger.info(
-                "[ORPHAN] would_delete=%s age=%ss priv=%s pub=%s",
+                "[ORPHAN] would_delete=%s sightings=%s/%s age=%ss priv=%s pub=%s",
                 "yes" if wouldDelete else "no",
+                sightings, confirmations,
                 int(age) if age is not None else "?",
                 priv,
                 pub,
             )
 
-        stale = [priv or pub for priv, pub, _, wouldDelete in orphans if wouldDelete]
-        stale = [ip for ip in stale if ip]
+        stale = [
+            ip for ip, count in self._orphanSightings.items()
+            if count >= confirmations
+        ]
         if not stale:
-            return
-        if not registeredIps:
-            logger.warning(
-                "[ORPHAN] Kamailio reports no registered gateway, skipping deletion of %s",
-                stale,
-            )
             return
 
         logger.info("[ORPHAN] destroying stale unregistered instance(s): %s", stale)
         self.csp.destroyInstances(stale)
+        for ip in stale:
+            self._orphanSightings.pop(ip, None)
         self._instanceCache = None
 
     # Get current available capacity

@@ -119,6 +119,7 @@ docker compose build scaler && docker compose up -d scaler
   "cleaner_blacklist": [],
   "api_token": "<token>",
   "cleanup_threshold_seconds": 600,
+  "orphan_confirmations": 3,
   "create_timeout_seconds": 300
 }
 ```
@@ -132,7 +133,8 @@ docker compose build scaler && docker compose up -d scaler
 | `redis` | Redis access, Media variant only |
 | `cleaner_blacklist` | IP addresses the cleanup must never destroy |
 | `api_token` | bearer token expected on the HTTP endpoint |
-| `cleanup_threshold_seconds` | SIP: age after which an unregistered provider VM is destroyed; Media: how long a gateway may stay in `stopping` |
+| `cleanup_threshold_seconds` | SIP: age after which an unregistered provider VM *may* be destroyed; Media: how long a gateway may stay in `stopping` |
+| `orphan_confirmations` | SIP: consecutive iterations a stale unregistered VM must be seen before destroy (default 3) |
 | `create_timeout_seconds` | OpenStack: recycle servers still in `BUILD` after this delay; age beyond which a non-registered VM stops counting as in-flight |
 
 ### The schedule
@@ -237,9 +239,12 @@ so a booting gateway is not immediately cancelled by a release.
 
 - Destroy gateways marked `to_stop` in Kamailio.
 - Destroy provider VMs unknown to Kamailio once older than
-  `cleanup_threshold_seconds` (`would_delete=yes`). Skipped entirely if Kamailio
-  reports **no** registered gateway (avoids wiping the fleet during a registrar
-  restart).
+  `cleanup_threshold_seconds` (`would_delete=yes`) **and** seen in that state for
+  `orphan_confirmations` consecutive iterations (default 3). A single missed
+  registration at the end of a call does not destroy the VM. Skipped entirely if
+  Kamailio reports **no** registered gateway (avoids wiping the fleet during a
+  registrar restart). The sightings counter resets as soon as the VM reappears in
+  Kamailio.
 - Destroy instances that still have no public IP after 10 minutes.
 
 ### Cleanup (Media)
@@ -286,7 +291,8 @@ If `maxGw = 8`, only 2 are created.
 down on a false overcount; the next iteration can retry.
 
 **Orphan:** VM at the provider, unknown to Kamailio for more than
-`cleanup_threshold_seconds` → destroyed on cleanup.
+`cleanup_threshold_seconds`, seen that way for `orphan_confirmations` consecutive
+iterations → destroyed on cleanup.
 
 ---
 
